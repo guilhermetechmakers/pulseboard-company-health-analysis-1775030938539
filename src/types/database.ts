@@ -834,6 +834,11 @@ export interface Database {
           single_company_mode: boolean
           failed_login_attempts: number
           locked_until: string | null
+          avatar_url: string | null
+          timezone: string | null
+          language: string | null
+          job_title: string | null
+          preferred_communication_channel: string | null
           created_at: string
           updated_at: string
         }
@@ -851,10 +856,101 @@ export interface Database {
           single_company_mode?: boolean
           failed_login_attempts?: number
           locked_until?: string | null
+          avatar_url?: string | null
+          timezone?: string | null
+          language?: string | null
+          job_title?: string | null
+          preferred_communication_channel?: string | null
           created_at?: string
           updated_at?: string
         }
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>
+        Relationships: []
+      }
+      workspace_teams: {
+        Row: {
+          id: string
+          owner_user_id: string
+          company_id: string
+          seats: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          owner_user_id: string
+          company_id: string
+          seats?: number
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['workspace_teams']['Insert']>
+        Relationships: []
+      }
+      workspace_team_members: {
+        Row: {
+          id: string
+          team_id: string
+          user_id: string
+          role: string
+          status: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          team_id: string
+          user_id: string
+          role?: string
+          status?: string
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['workspace_team_members']['Insert']>
+        Relationships: []
+      }
+      workspace_team_invites: {
+        Row: {
+          id: string
+          team_id: string
+          email: string
+          role: string
+          status: string
+          invited_by: string
+          created_at: string
+          expires_at: string | null
+        }
+        Insert: {
+          id?: string
+          team_id: string
+          email: string
+          role?: string
+          status?: string
+          invited_by: string
+          created_at?: string
+          expires_at?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['workspace_team_invites']['Insert']>
+        Relationships: []
+      }
+      billing_receipts: {
+        Row: {
+          id: string
+          user_id: string
+          label: string
+          amount_cents: number | null
+          currency: string
+          issued_at: string
+          external_url: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          label: string
+          amount_cents?: number | null
+          currency?: string
+          issued_at?: string
+          external_url?: string | null
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['billing_receipts']['Insert']>
         Relationships: []
       }
       admin_actions: {

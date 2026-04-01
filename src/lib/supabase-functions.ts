@@ -743,6 +743,52 @@ export async function invokePulseReportViewerApi<T = unknown>(body: PulseReportV
   return json.data as T
 }
 
+export type PulseSettingsApiBody =
+  | { op: 'csv_parse_preview'; csvText: string; targetModel?: 'financials' | 'market' | 'social' }
+  | { op: 'billing_summary'; companyId: string }
+  | { op: 'account_delete_request'; companyId: string; password: string; reason?: string }
+
+/** Settings hub Edge Function: CSV preview, billing summary, account deletion request (audit + profile flag). */
+export async function invokePulseSettingsApi<T>(body: PulseSettingsApiBody): Promise<T> {
+  if (!supabase) {
+    throw new Error('Supabase is not configured')
+  }
+  const url = import.meta.env.VITE_SUPABASE_URL
+  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
+  if (!url || !anon) {
+    throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
+  }
+
+  const headers = await buildAuthenticatedEdgeHeaders()
+  if (!headers.Authorization?.startsWith('Bearer ')) {
+    throw new Error('Sign in required')
+  }
+
+  const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/pulse-settings-api`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  })
+
+  const json = (await res.json()) as { data?: T; error?: string | null }
+  if (!res.ok) {
+    const errMsg =
+      typeof json.error === 'string'
+        ? json.error
+        : json.error !== undefined
+          ? JSON.stringify(json.error)
+          : `pulse-settings-api failed (${res.status})`
+    throw new Error(errMsg)
+  }
+  if (json.error !== null && json.error !== undefined && json.error !== '') {
+    throw new Error(typeof json.error === 'string' ? json.error : JSON.stringify(json.error))
+  }
+  if (json.data === undefined) {
+    throw new Error('Invalid response from pulse-settings-api')
+  }
+  return json.data as T
+}
+
 export async function invokePulseActiveCompany(body: PulseActiveCompanyBody): Promise<Record<string, unknown>> {
   if (!supabase) {
     throw new Error('Supabase is not configured')

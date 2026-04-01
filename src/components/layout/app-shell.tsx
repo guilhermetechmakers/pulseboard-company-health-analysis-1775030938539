@@ -15,7 +15,7 @@ const baseLinks = [
   { to: '/', label: 'Landing', end: true },
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/company', label: 'Workspace' },
-  { to: '/settings', label: 'Integrations' },
+  { to: '/settings', label: 'Settings' },
   { to: '/data/import', label: 'Data import' },
   { to: '/data/export', label: 'Data export' },
   { to: '/search', label: 'Search' },

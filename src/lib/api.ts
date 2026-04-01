@@ -110,3 +110,17 @@ export {
   restoreReportSnapshot,
   invokeReportViewerOp,
 } from '@/api/report-viewer'
+
+/** Settings — team, CSV preview, billing summary, account deletion (`pulse-settings-api`). */
+export {
+  fetchSettingsTeamBundle,
+  sendTeamInvite,
+  revokeTeamInvite,
+  removeTeamMember,
+  parseCsvPreview,
+  settingsBillingSummary,
+  settingsAccountDeleteRequest,
+  deleteAccountWithPassword,
+} from '@/api/settings'
+
+export { invokePulseSettingsApi, type PulseSettingsApiBody } from '@/lib/supabase-functions'

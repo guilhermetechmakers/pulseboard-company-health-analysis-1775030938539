@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -8,16 +8,16 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { IntegrationProviderCard } from '@/components/integrations/integration-provider-card'
 import { SyncHistoryPanel } from '@/components/integrations/sync-history-panel'
-import { INTEGRATION_PROVIDERS } from '@/types/integrations'
+import { SettingsContainer } from '@/components/settings/settings-container'
 import type { IntegrationProvider } from '@/types/integrations'
+import { useAuth } from '@/contexts/auth-context'
+import { useUserProfile } from '@/hooks/use-auth-profile'
 import { useMyCompany } from '@/hooks/use-my-company'
 import { useIntegrations, useEnsureIntegrationMutation } from '@/hooks/use-integrations'
 import { useSyncJobs } from '@/hooks/use-sync-jobs'
 import { csvImportRequest, integrationOAuthExchange } from '@/api/integration-functions'
 import { supabase } from '@/lib/supabase'
-import { SettingsNotificationsPanel } from '@/components/notifications/settings-notifications-panel'
 
 const csvSchema = z.object({
   csvText: z.string().min(3, 'Paste at least one row'),
@@ -31,6 +31,9 @@ export function SettingsPage() {
   const csvSectionRef = useRef<HTMLElement>(null)
   const [searchParams, setSearchParams] = useSearchParams()
   const formId = useId()
+  const { user } = useAuth()
+  const userId = user?.id
+  const { data: profile, isLoading: profileLoading } = useUserProfile(userId)
   const { data: company, isLoading } = useMyCompany()
   const companyId = company?.id
   const { data: integrations = [], isLoading: intLoading } = useIntegrations(companyId)
@@ -115,77 +118,24 @@ export function SettingsPage() {
       <section className="space-y-4">
         <h1 className="text-3xl font-semibold">Settings</h1>
         <Card className="p-8 text-center text-muted-foreground">
-          Create a company before managing integrations.
+          Create a company before managing settings.
         </Card>
       </section>
     )
   }
 
+  const safeIntegrations = Array.isArray(integrations) ? integrations : []
+
   return (
-    <section className="space-y-10 animate-fade-in-up">
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Settings & preferences</h1>
-        <p className="mt-1 text-muted-foreground">
-          OAuth connections, sync cadence, CSV ingestion, and sync history. Tokens stay server-side via Edge Functions.
-        </p>
-      </div>
-
-      <Card className="p-6">
-        <h2 className="text-lg font-semibold">Profile quick link</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Account security and subscription live on the profile screen.</p>
-        <Button asChild variant="secondary" className="mt-4">
-          <Link to="/profile">Open profile</Link>
-        </Button>
-      </Card>
-
-      {supabase ? <SettingsNotificationsPanel /> : null}
-
-      <Card className="p-6">
-        <h2 className="text-lg font-semibold">Data import & export</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Full consoles include drag-and-drop CSV upload, column mapping, validation previews, export presets, and job history.
-          Pair with notification channels <span className="font-medium">Export ready</span> and{' '}
-          <span className="font-medium">Job failed</span> for pipeline alerts.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-3">
-          <Button asChild variant="primary" className="min-h-[44px]">
-            <Link to="/data/import">Open import console</Link>
-          </Button>
-          <Button asChild variant="secondary" className="min-h-[44px]">
-            <Link to="/data/export">Open export console</Link>
-          </Button>
-        </div>
-      </Card>
-
-      <div>
-        <h2 className="mb-2 text-xl font-semibold">Integrations</h2>
-        <p className="mb-6 max-w-3xl text-sm text-muted-foreground">
-          Connect sources to hydrate financial, analytics, social, and billing models. Use &quot;Sync now&quot; after connecting
-          to pull normalized snapshots. Test connections in development with &quot;Demo connect&quot; when functions are deployed.
-        </p>
-        {intLoading ? (
-          <div className="grid gap-4 md:grid-cols-2">
-            <Skeleton className="h-72" />
-            <Skeleton className="h-72" />
-          </div>
-        ) : (
-          <div className="grid auto-rows-fr gap-4 md:grid-cols-2">
-            {INTEGRATION_PROVIDERS.map((p) => (
-              <IntegrationProviderCard
-                key={p.id}
-                companyId={companyId}
-                provider={p.id}
-                label={p.label}
-                description={p.description}
-                scopes={p.scopes}
-                integration={(integrations ?? []).find((i) => i.provider === p.id)}
-                onCsvFocus={scrollToCsv}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
+    <SettingsContainer
+      userId={userId}
+      companyId={companyId}
+      profile={profile}
+      profileLoading={profileLoading}
+      integrations={safeIntegrations}
+      integrationsLoading={intLoading}
+      onCsvFocus={scrollToCsv}
+    >
       <section
         ref={csvSectionRef}
         id="csv-import"
@@ -193,15 +143,17 @@ export function SettingsPage() {
         aria-labelledby={`${formId}-csv-heading`}
       >
         <h2 id={`${formId}-csv-heading`} className="text-lg font-semibold">
-          CSV upload connector
+          CSV upload connector (run import)
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Financials require <code className="rounded bg-muted px-1">revenue</code> and{' '}
-          <code className="rounded bg-muted px-1">expenses</code> columns (header row). Market and social accept flexible
-          columns mapped as JSON rows.
+          <code className="rounded bg-muted px-1">expenses</code> columns (header row). Use the preview above first, then commit
+          rows here via <code className="rounded bg-muted px-1">pulse-data-io</code>.
         </p>
         {!supabase && (
-          <p className="mt-2 text-sm text-destructive">Configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to enable import.</p>
+          <p className="mt-2 text-sm text-destructive" role="alert">
+            Configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to enable import.
+          </p>
         )}
         <form className="mt-4 space-y-4" onSubmit={handleSubmit(onCsvSubmit)}>
           <div className="grid gap-4 md:grid-cols-2">
@@ -238,9 +190,13 @@ export function SettingsPage() {
               {...register('csvText')}
               aria-invalid={Boolean(errors.csvText)}
             />
-            {errors.csvText && <p className="mt-1 text-sm text-destructive">{errors.csvText.message}</p>}
+            {errors.csvText && (
+              <p className="mt-1 text-sm text-destructive" role="alert">
+                {errors.csvText.message}
+              </p>
+            )}
           </div>
-          <Button type="submit" disabled={isSubmitting || !supabase}>
+          <Button type="submit" disabled={isSubmitting || !supabase} className="min-h-[44px]">
             {isSubmitting ? 'Importing…' : 'Run import'}
           </Button>
         </form>
@@ -249,12 +205,12 @@ export function SettingsPage() {
       <SyncHistoryPanel jobs={jobs ?? []} isLoading={jobsLoading} />
 
       <Card className="border-dashed p-6">
-        <h3 className="font-medium">Audit & exports</h3>
+        <h3 className="font-medium">Audit & compliance</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Sensitive actions are logged to <code className="rounded bg-muted px-1">audit_logs</code> via Edge Functions. Data export
-          utilities can reuse the same RLS-scoped Supabase client patterns.
+          Sensitive actions are logged to <code className="rounded bg-muted px-1">audit_logs</code> and{' '}
+          <code className="rounded bg-muted px-1">user_activity_logs</code> via Edge Functions and RLS-scoped clients.
         </p>
       </Card>
-    </section>
+    </SettingsContainer>
   )
 }
