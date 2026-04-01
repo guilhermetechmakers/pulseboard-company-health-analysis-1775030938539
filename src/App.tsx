@@ -28,6 +28,8 @@ import {
   PasswordResetConfirmPage,
   NotFoundPage,
   NotificationsPage,
+  DataImportPage,
+  DataExportPage,
 } from '@/pages'
 import { AdminOnlyRoute } from '@/components/auth/admin-only-route'
 import { AdminLayout } from '@/components/layout/admin-layout'
@@ -83,6 +85,8 @@ export default function App() {
               <Route path="/export/:id" element={<Guard><ExportSettingsPage /></Guard>} />
               <Route path="/profile" element={<Guard><UserProfilePage /></Guard>} />
               <Route path="/settings" element={<Guard><SettingsPage /></Guard>} />
+              <Route path="/data/import" element={<Guard><DataImportPage /></Guard>} />
+              <Route path="/data/export" element={<Guard><DataExportPage /></Guard>} />
               <Route path="/notifications" element={<Guard><NotificationsPage /></Guard>} />
               <Route
                 path="/admin"

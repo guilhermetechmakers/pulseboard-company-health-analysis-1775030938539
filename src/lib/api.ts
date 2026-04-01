@@ -70,6 +70,12 @@ export {
   invokeExportDownloadUrl,
   invokeEmailSend,
   invokeEmailRetry,
+  invokePulseDataIo,
+  pulseDataIoImportCsv,
+  pulseDataIoImportStatus,
+  pulseDataIoExportCsv,
+  pulseDataIoExportStatus,
+  pulseDataIoExportDownload,
 } from '@/lib/supabase-functions'
 
 /** TTL-backed workspace reads (deploy `pulse-cache-api` Edge Function). */

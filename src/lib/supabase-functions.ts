@@ -1,6 +1,13 @@
 import { supabase } from '@/lib/supabase'
 import type { AnalyzeCompanyRequest } from '@/types/analysis'
 import type { ExportDownloadUrlResponseData, ReportExportResponseData } from '@/types/export'
+import type {
+  PulseDataIoExportDownloadResponse,
+  PulseDataIoExportResponse,
+  PulseDataIoExportStatusResponse,
+  PulseDataIoImportResponse,
+  PulseDataIoImportStatusResponse,
+} from '@/types/data-io'
 
 export interface AnalyzeCompanyResponse {
   data: {
@@ -447,6 +454,108 @@ export type ClientErrorReportBody = {
   route?: string
   componentStack?: string
   correlationId?: string
+}
+
+export type PulseDataIoBody = Record<string, unknown> & { op: string }
+
+/** Data import/export (CSV mapping, jobs, backups). Deploy `pulse-data-io` Edge Function. */
+export async function invokePulseDataIo<T = unknown>(body: PulseDataIoBody): Promise<T> {
+  if (!supabase) {
+    throw new Error('Supabase is not configured')
+  }
+  const url = import.meta.env.VITE_SUPABASE_URL
+  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
+  if (!url || !anon) {
+    throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
+  }
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  if (!session?.access_token) {
+    throw new Error('Sign in required')
+  }
+  const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/pulse-data-io`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      apikey: anon,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+  const json = (await res.json()) as T & { error?: unknown }
+  if (!res.ok) {
+    const errMsg =
+      typeof json.error === 'string'
+        ? json.error
+        : json.error !== undefined
+          ? JSON.stringify(json.error)
+          : `pulse-data-io failed (${res.status})`
+    throw new Error(errMsg)
+  }
+  return json as T
+}
+
+export async function pulseDataIoImportCsv(payload: {
+  companyId: string
+  csvText: string
+  targetModel: 'financials' | 'market' | 'social'
+  fileName?: string
+  mapping?: Record<string, string>
+}): Promise<PulseDataIoImportResponse> {
+  return invokePulseDataIo<PulseDataIoImportResponse>({
+    op: 'import_csv',
+    companyId: payload.companyId,
+    csvText: payload.csvText,
+    targetModel: payload.targetModel,
+    fileName: payload.fileName ?? 'import.csv',
+    mapping: payload.mapping ?? {},
+  })
+}
+
+export async function pulseDataIoImportStatus(importJobId: string): Promise<PulseDataIoImportStatusResponse> {
+  return invokePulseDataIo<PulseDataIoImportStatusResponse>({
+    op: 'import_status',
+    importJobId,
+  })
+}
+
+export async function pulseDataIoImportRetry(importJobId: string): Promise<PulseDataIoImportResponse> {
+  return invokePulseDataIo<PulseDataIoImportResponse>({
+    op: 'import_retry',
+    importJobId,
+  })
+}
+
+export async function pulseDataIoExportCsv(payload: {
+  companyId: string
+  preset: 'full_backup' | 'selective' | 'compliance'
+  format?: 'csv' | 'xlsx'
+  fields?: string[]
+  scheduleCadence?: string | null
+}): Promise<PulseDataIoExportResponse> {
+  return invokePulseDataIo<PulseDataIoExportResponse>({
+    op: 'export_csv',
+    companyId: payload.companyId,
+    preset: payload.preset,
+    format: payload.format ?? 'csv',
+    fields: payload.fields ?? [],
+    scheduleCadence: payload.scheduleCadence ?? null,
+  })
+}
+
+export async function pulseDataIoExportStatus(exportJobId: string): Promise<PulseDataIoExportStatusResponse> {
+  return invokePulseDataIo<PulseDataIoExportStatusResponse>({
+    op: 'export_status',
+    exportJobId,
+  })
+}
+
+export async function pulseDataIoExportDownload(exportJobId: string): Promise<PulseDataIoExportDownloadResponse> {
+  return invokePulseDataIo<PulseDataIoExportDownloadResponse>({
+    op: 'export_download',
+    exportJobId,
+  })
 }
 
 /** Reports UI errors to Edge Function (audit_logs + optional webhook). Non-blocking. */

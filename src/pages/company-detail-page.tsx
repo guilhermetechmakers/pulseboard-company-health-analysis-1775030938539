@@ -14,6 +14,7 @@ import { CacheStatusBadge } from '@/components/cache/cache-status-badge'
 import { AnalysisHistoryTimeline } from '@/components/company/analysis-history-timeline'
 import { SaveInputSnapshotPanel } from '@/components/company/save-input-snapshot-panel'
 import { CompanyWorkspaceForms } from '@/components/company/company-workspace-forms'
+import { DataIoActivityPanel } from '@/components/data-io/data-io-activity-panel'
 import { useMyCompany } from '@/hooks/use-my-company'
 import { useCompanyReports } from '@/hooks/use-analysis'
 import { useIntegrations } from '@/hooks/use-integrations'
@@ -194,6 +195,8 @@ export function CompanyDetailPage() {
         market={agg?.market ?? null}
         social={agg?.social ?? null}
       />
+
+      <DataIoActivityPanel companyId={companyId} />
 
       <AnalysisHistoryTimeline
         entries={safeHistory}

@@ -12,6 +12,8 @@ const links = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/company', label: 'Company' },
   { to: '/settings', label: 'Integrations' },
+  { to: '/data/import', label: 'Data import' },
+  { to: '/data/export', label: 'Data export' },
   { to: '/company/create', label: 'Create Company' },
   { to: '/analysis/generate', label: 'Generate Analysis' },
 ]

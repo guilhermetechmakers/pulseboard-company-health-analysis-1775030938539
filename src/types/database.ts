@@ -454,6 +454,118 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['csv_uploads']['Insert']>
         Relationships: []
       }
+      company_imports: {
+        Row: {
+          id: string
+          company_id: string
+          user_id: string
+          status: string
+          rows_processed: number
+          errors: unknown[]
+          mapping: Record<string, unknown>
+          file_name: string
+          target_model: string | null
+          progress: number
+          error_message: string | null
+          source_text: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          user_id: string
+          status?: string
+          rows_processed?: number
+          errors?: unknown[]
+          mapping?: Record<string, unknown>
+          file_name?: string
+          target_model?: string | null
+          progress?: number
+          error_message?: string | null
+          source_text?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['company_imports']['Insert']>
+        Relationships: []
+      }
+      company_exports: {
+        Row: {
+          id: string
+          user_id: string
+          company_id: string | null
+          scope: Record<string, unknown>
+          format: string
+          status: string
+          progress: number
+          fields_subset: string[]
+          result_csv: string | null
+          result_size: number | null
+          schedule_cadence: string | null
+          error_message: string | null
+          generated_at: string | null
+          downloaded_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          company_id?: string | null
+          scope?: Record<string, unknown>
+          format?: string
+          status?: string
+          progress?: number
+          fields_subset?: string[]
+          result_csv?: string | null
+          result_size?: number | null
+          schedule_cadence?: string | null
+          error_message?: string | null
+          generated_at?: string | null
+          downloaded_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['company_exports']['Insert']>
+        Relationships: []
+      }
+      import_mappings: {
+        Row: {
+          id: string
+          user_id: string
+          source_key: string
+          target_field: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          source_key: string
+          target_field: string
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['import_mappings']['Insert']>
+        Relationships: []
+      }
+      import_audit: {
+        Row: {
+          id: string
+          import_id: string
+          action: string
+          detail: Record<string, unknown>
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          import_id: string
+          action: string
+          detail?: Record<string, unknown>
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['import_audit']['Insert']>
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           id: string

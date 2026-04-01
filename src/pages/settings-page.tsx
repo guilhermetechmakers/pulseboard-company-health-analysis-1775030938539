@@ -140,6 +140,23 @@ export function SettingsPage() {
 
       {supabase ? <SettingsNotificationsPanel /> : null}
 
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold">Data import & export</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Full consoles include drag-and-drop CSV upload, column mapping, validation previews, export presets, and job history.
+          Pair with notification channels <span className="font-medium">Export ready</span> and{' '}
+          <span className="font-medium">Job failed</span> for pipeline alerts.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Button asChild variant="primary" className="min-h-[44px]">
+            <Link to="/data/import">Open import console</Link>
+          </Button>
+          <Button asChild variant="secondary" className="min-h-[44px]">
+            <Link to="/data/export">Open export console</Link>
+          </Button>
+        </div>
+      </Card>
+
       <div>
         <h2 className="mb-2 text-xl font-semibold">Integrations</h2>
         <p className="mb-6 max-w-3xl text-sm text-muted-foreground">

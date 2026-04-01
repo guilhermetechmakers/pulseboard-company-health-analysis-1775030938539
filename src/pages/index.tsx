@@ -18,6 +18,8 @@ export { PasswordResetRequestPage } from '@/pages/password-reset-request-page'
 export { PasswordResetConfirmPage } from '@/pages/password-reset-confirm-page'
 export { UserProfilePage } from '@/pages/user-profile-page'
 export { NotificationsPage } from '@/pages/notifications-page'
+export { DataImportPage } from '@/pages/data-import-page'
+export { DataExportPage } from '@/pages/data-export-page'
 
 function sectionCard(title: string, text: string) {
   return (
