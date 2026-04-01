@@ -17,11 +17,16 @@ import {
   hasMarketSignals,
   hasSocialSignals,
 } from '@/hooks/use-company-aggregates'
+import { EmailVerificationBanner } from '@/components/auth/email-verification-banner'
+import { useAuth } from '@/contexts/auth-context'
+import { useVerificationResend } from '@/hooks/use-verification-resend'
 import { buildCompletenessSlices, completenessPercent, healthSubscores } from '@/lib/dashboard-utils'
 import { asRecord, pickNumber } from '@/lib/safe-data'
 import { cn } from '@/lib/utils'
 
 export function DashboardPage() {
+  const { user, isEmailVerified } = useAuth()
+  const { resend, cooldown, isSending } = useVerificationResend(user?.email)
   const { data: company, isLoading: companyLoading } = useMyCompany()
   const companyId = company?.id
   const { data: integrations = [], isLoading: intLoading } = useIntegrations(companyId)
@@ -57,6 +62,13 @@ export function DashboardPage() {
   if (!companyLoading && !company) {
     return (
       <section className="space-y-8 animate-fade-in-up">
+        <EmailVerificationBanner
+          email={user?.email}
+          isVerified={isEmailVerified}
+          onResend={() => void resend()}
+          isResending={isSending}
+          cooldownSeconds={cooldown}
+        />
         <div className="surface-card relative overflow-hidden p-10 text-center">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/5" />
           <div className="relative space-y-4">
@@ -76,6 +88,13 @@ export function DashboardPage() {
 
   return (
     <section className="space-y-8 animate-fade-in-up">
+      <EmailVerificationBanner
+        email={user?.email}
+        isVerified={isEmailVerified}
+        onResend={() => void resend()}
+        isResending={isSending}
+        cooldownSeconds={cooldown}
+      />
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>

@@ -1,11 +1,14 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import type { ReactNode } from 'react'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import { AppShell } from '@/components/layout/app-shell'
+import { AuthProvider } from '@/contexts/auth-context'
+import { ProtectedRoute } from '@/components/auth/protected-route'
 import {
   LandingPage,
   SignupPage,
-  EmailVerificationPage,
+  VerifyEmailPage,
   LoginPage,
   DashboardPage,
   CreateCompanyPage,
@@ -20,7 +23,8 @@ import {
   SettingsPage,
   AdminUsersPage,
   AdminDashboardPage,
-  PasswordResetPage,
+  PasswordResetRequestPage,
+  PasswordResetConfirmPage,
   NotFoundPage,
 } from '@/pages'
 
@@ -35,41 +39,51 @@ const queryClient = new QueryClient({
   },
 })
 
+function Guard({ children }: { children: ReactNode }) {
+  return <ProtectedRoute>{children}</ProtectedRoute>
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AppShell>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/signup" element={<SignupPage />} />
-            <Route path="/verify-email" element={<EmailVerificationPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/reset-password" element={<PasswordResetPage />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/dashboard/overview" element={<DashboardPage />} />
-            <Route path="/dashboard/analytics" element={<CompanyDetailPage />} />
-            <Route path="/dashboard/settings" element={<SettingsPage />} />
-            <Route path="/dashboard/users" element={<AdminUsersPage />} />
-            <Route path="/dashboard/projects" element={<CreateCompanyPage />} />
-            <Route path="/company/create" element={<CreateCompanyPage />} />
-            <Route path="/company" element={<CompanyDetailPage />} />
-            <Route path="/financials" element={<FinancialsPage />} />
-            <Route path="/market" element={<MarketDataPage />} />
-            <Route path="/social-brand" element={<SocialBrandPage />} />
-            <Route path="/analysis/generate" element={<GenerateAnalysisPage />} />
-            <Route path="/generate" element={<GenerateAnalysisPage />} />
-            <Route path="/report/:id" element={<ReportViewerPage />} />
-            <Route path="/reports/:reportId" element={<ReportViewerPage />} />
-            <Route path="/export/:id" element={<ExportSettingsPage />} />
-            <Route path="/profile" element={<UserProfilePage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/admin/users" element={<AdminUsersPage />} />
-            <Route path="/admin" element={<AdminDashboardPage />} />
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
-        </AppShell>
-      </BrowserRouter>
+      <AuthProvider>
+        <BrowserRouter>
+          <AppShell>
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/signup" element={<SignupPage />} />
+              <Route path="/verify-email" element={<VerifyEmailPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/password-reset" element={<PasswordResetRequestPage />} />
+              <Route path="/password-reset/confirm" element={<PasswordResetConfirmPage />} />
+              <Route path="/password-reset/:token" element={<PasswordResetConfirmPage />} />
+              <Route path="/reset-password" element={<Navigate to="/password-reset" replace />} />
+
+              <Route path="/dashboard" element={<Guard><DashboardPage /></Guard>} />
+              <Route path="/dashboard/overview" element={<Guard><DashboardPage /></Guard>} />
+              <Route path="/dashboard/analytics" element={<Guard><CompanyDetailPage /></Guard>} />
+              <Route path="/dashboard/settings" element={<Guard><SettingsPage /></Guard>} />
+              <Route path="/dashboard/users" element={<Guard><AdminUsersPage /></Guard>} />
+              <Route path="/dashboard/projects" element={<Guard><CreateCompanyPage /></Guard>} />
+              <Route path="/company/create" element={<Guard><CreateCompanyPage /></Guard>} />
+              <Route path="/company" element={<Guard><CompanyDetailPage /></Guard>} />
+              <Route path="/financials" element={<Guard><FinancialsPage /></Guard>} />
+              <Route path="/market" element={<Guard><MarketDataPage /></Guard>} />
+              <Route path="/social-brand" element={<Guard><SocialBrandPage /></Guard>} />
+              <Route path="/analysis/generate" element={<Guard><GenerateAnalysisPage /></Guard>} />
+              <Route path="/generate" element={<Guard><GenerateAnalysisPage /></Guard>} />
+              <Route path="/report/:id" element={<Guard><ReportViewerPage /></Guard>} />
+              <Route path="/reports/:reportId" element={<Guard><ReportViewerPage /></Guard>} />
+              <Route path="/export/:id" element={<Guard><ExportSettingsPage /></Guard>} />
+              <Route path="/profile" element={<Guard><UserProfilePage /></Guard>} />
+              <Route path="/settings" element={<Guard><SettingsPage /></Guard>} />
+              <Route path="/admin/users" element={<Guard><AdminUsersPage /></Guard>} />
+              <Route path="/admin" element={<Guard><AdminDashboardPage /></Guard>} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </AppShell>
+        </BrowserRouter>
+      </AuthProvider>
       <Toaster richColors position="top-right" />
     </QueryClientProvider>
   )

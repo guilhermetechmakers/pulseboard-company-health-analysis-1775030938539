@@ -74,6 +74,14 @@
   }
 }
 
+@layer utilities {
+  @media (prefers-reduced-motion: reduce) {
+    .motion-reduce\:animate-none {
+      animation: none !important;
+    }
+  }
+}
+
 :focus-visible {
   outline: 2px solid rgb(var(--ring));
   outline-offset: 2px;

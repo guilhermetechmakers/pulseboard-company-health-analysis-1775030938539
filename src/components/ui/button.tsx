@@ -2,7 +2,7 @@ import { type ButtonHTMLAttributes } from 'react'
 import { Slot } from '@radix-ui/react-slot'
 import { cn } from '@/lib/utils'
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost'
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'outline'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant
@@ -13,6 +13,7 @@ const variantStyles: Record<ButtonVariant, string> = {
   primary: 'bg-primary text-primary-foreground hover:opacity-95',
   secondary: 'border border-border bg-card text-foreground hover:bg-muted',
   ghost: 'bg-transparent text-foreground hover:bg-muted',
+  outline: 'border border-border bg-transparent text-foreground hover:bg-muted',
 }
 
 export function Button({ className, variant = 'primary', asChild, ...props }: ButtonProps) {

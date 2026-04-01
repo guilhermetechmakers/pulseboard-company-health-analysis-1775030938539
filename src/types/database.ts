@@ -404,6 +404,130 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['audit_logs']['Insert']>
         Relationships: []
       }
+      profiles: {
+        Row: {
+          id: string
+          display_name: string | null
+          role: string
+          plan_tier: string
+          signup_origin: string | null
+          privacy_consent_at: string | null
+          last_context_company_id: string | null
+          failed_login_attempts: number
+          locked_until: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          display_name?: string | null
+          role?: string
+          plan_tier?: string
+          signup_origin?: string | null
+          privacy_consent_at?: string | null
+          last_context_company_id?: string | null
+          failed_login_attempts?: number
+          locked_until?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['profiles']['Insert']>
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          id: string
+          user_id: string
+          plan_id: string
+          status: string
+          next_billing_date: string | null
+          current_period_end: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          plan_id?: string
+          status?: string
+          next_billing_date?: string | null
+          current_period_end?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['subscriptions']['Insert']>
+        Relationships: []
+      }
+      user_activity_logs: {
+        Row: {
+          id: string
+          user_id: string
+          action: string
+          metadata: Record<string, unknown>
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          action: string
+          metadata?: Record<string, unknown>
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['user_activity_logs']['Insert']>
+        Relationships: []
+      }
+      email_verification_events: {
+        Row: {
+          id: string
+          user_id: string | null
+          event_type: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          event_type: string
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['email_verification_events']['Insert']>
+        Relationships: []
+      }
+      password_reset_events: {
+        Row: {
+          id: string
+          user_id: string | null
+          email: string | null
+          event_type: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          email?: string | null
+          event_type: string
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['password_reset_events']['Insert']>
+        Relationships: []
+      }
+      user_mfa_settings: {
+        Row: {
+          user_id: string
+          enabled: boolean
+          factor_id: string | null
+          recovery_codes_remaining: number
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          enabled?: boolean
+          factor_id?: string | null
+          recovery_codes_remaining?: number
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['user_mfa_settings']['Insert']>
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>

@@ -1,3 +1,5 @@
+import { supabase } from '@/lib/supabase'
+
 export class ApiError extends Error {
   status?: number
 
@@ -8,17 +10,34 @@ export class ApiError extends Error {
   }
 }
 
+export async function getAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+
+  if (supabase) {
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+    if (token) {
+      headers.Authorization = `Bearer ${token}`
+    }
+  } else {
+    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null
+    if (token) {
+      headers.Authorization = `Bearer ${token}`
+    }
+  }
+
+  return headers
+}
+
 async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
   const url = `${baseUrl}${endpoint}`
+  const authHeaders = await getAuthHeaders()
   const headers: HeadersInit = {
-    'Content-Type': 'application/json',
+    ...authHeaders,
     ...(options.headers || {}),
-  }
-
-  const token = localStorage.getItem('auth_token')
-  if (token) {
-    ;(headers as Record<string, string>).Authorization = `Bearer ${token}`
   }
 
   const response = await fetch(url, { ...options, headers })

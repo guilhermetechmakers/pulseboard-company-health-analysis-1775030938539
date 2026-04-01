@@ -59,3 +59,42 @@ export async function invokeAnalyzeCompanyHealth(
 
   return json as AnalyzeCompanyResponse
 }
+
+export type AuthServerLogBody = {
+  eventType: 'password_reset_requested' | 'password_reset_completed' | 'signup_telemetry'
+  email?: string
+  metadata?: Record<string, unknown>
+}
+
+/** Server-audited auth events (optional; fails silently if not deployed). */
+export async function invokeAuthServerLog(body: AuthServerLogBody): Promise<void> {
+  if (!supabase) return
+  const url = import.meta.env.VITE_SUPABASE_URL
+  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
+  if (!url || !anon) return
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  const headers: Record<string, string> = {
+    apikey: anon,
+    'Content-Type': 'application/json',
+  }
+  if (session?.access_token) {
+    headers.Authorization = `Bearer ${session.access_token}`
+  }
+
+  try {
+    const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/auth-server-log`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) {
+      /* non-blocking */
+    }
+  } catch {
+    /* non-blocking */
+  }
+}
