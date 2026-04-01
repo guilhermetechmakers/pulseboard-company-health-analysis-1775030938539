@@ -5,6 +5,8 @@ import { LayoutDashboard, FileText } from 'lucide-react'
 const links = [
   { to: '/', label: 'Landing' },
   { to: '/dashboard', label: 'Dashboard' },
+  { to: '/company', label: 'Company' },
+  { to: '/settings', label: 'Integrations' },
   { to: '/company/create', label: 'Create Company' },
   { to: '/analysis/generate', label: 'Generate Analysis' },
 ]

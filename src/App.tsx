@@ -47,6 +47,11 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/reset-password" element={<PasswordResetPage />} />
             <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/dashboard/overview" element={<DashboardPage />} />
+            <Route path="/dashboard/analytics" element={<CompanyDetailPage />} />
+            <Route path="/dashboard/settings" element={<SettingsPage />} />
+            <Route path="/dashboard/users" element={<AdminUsersPage />} />
+            <Route path="/dashboard/projects" element={<CreateCompanyPage />} />
             <Route path="/company/create" element={<CreateCompanyPage />} />
             <Route path="/company" element={<CompanyDetailPage />} />
             <Route path="/financials" element={<FinancialsPage />} />
