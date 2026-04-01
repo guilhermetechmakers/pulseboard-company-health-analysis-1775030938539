@@ -8,6 +8,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from 'https://esm.sh/zod@3.23.8'
 import { corsHeaders } from '../_shared/cors.ts'
 import { asArray, asRecord } from '../_shared/safe-json.ts'
+import { createUserNotification } from '../_shared/pulse-notify.ts'
+import { sendTemplatedEmailIfEnabled } from '../_shared/transactional-email.ts'
 
 const requestSchema = z.object({
   companyId: z.string().uuid(),
@@ -338,6 +340,38 @@ Rules:
 
       await supabase.from('companies').update({ health_scores: healthScores, updated_at: new Date().toISOString() }).eq('id', companyId)
 
+      const companyName = typeof companyRecord.name === 'string' ? companyRecord.name : 'Your company'
+      const displayName =
+        typeof user.user_metadata?.display_name === 'string'
+          ? user.user_metadata.display_name
+          : (typeof user.email === 'string' ? user.email.split('@')[0] : 'there')
+      const appUrl = (Deno.env.get('PUBLIC_APP_URL') ?? Deno.env.get('SITE_URL') ?? '').replace(/\/$/, '')
+      const reportPath = appUrl ? `${appUrl}/report/${reportId}` : `/report/${reportId}`
+
+      await createUserNotification(supabase, {
+        userId: user.id,
+        type: 'analysis_complete',
+        message: `Analysis complete for ${companyName}. Open the report to review SWOT, risks, and actions.`,
+        data: { reportId, companyId, analysisDepth },
+      })
+
+      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      if (serviceKey) {
+        const admin = createClient(supabaseUrl, serviceKey)
+        await sendTemplatedEmailIfEnabled({
+          admin,
+          userId: user.id,
+          templateType: 'analysis_complete',
+          placeholders: {
+            userName: displayName,
+            companyName,
+            analysisId: reportId,
+            reportUrl: reportPath,
+          },
+          metadata: { reportId, companyId },
+        })
+      }
+
       return new Response(
         JSON.stringify({
           data: {
@@ -362,6 +396,39 @@ Rules:
           updated_at: new Date().toISOString(),
         })
         .eq('id', reportId)
+
+      await createUserNotification(supabase, {
+        userId: user.id,
+        type: 'job_failed',
+        message: `Analysis job failed: ${message}`,
+        data: { reportId, companyId, error: message },
+      })
+
+      const failDisplayName =
+        typeof user.user_metadata?.display_name === 'string'
+          ? user.user_metadata.display_name
+          : typeof user.email === 'string'
+            ? user.email.split('@')[0] ?? 'there'
+            : 'there'
+      const appUrlFail = (
+        Deno.env.get('PUBLIC_APP_URL') ?? Deno.env.get('SITE_URL') ?? Deno.env.get('APP_BASE_URL') ?? ''
+      ).replace(/\/$/, '')
+      const retryUrl = appUrlFail ? `${appUrlFail}/analysis/generate` : '/analysis/generate'
+      const skFail = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      if (skFail) {
+        const admFail = createClient(supabaseUrl, skFail)
+        await sendTemplatedEmailIfEnabled({
+          admin: admFail,
+          userId: user.id,
+          templateType: 'job_failed',
+          placeholders: {
+            userName: failDisplayName,
+            message,
+            retryUrl,
+          },
+          metadata: { reportId, companyId },
+        })
+      }
 
       return new Response(JSON.stringify({ error: message, reportId }), {
         status: 502,

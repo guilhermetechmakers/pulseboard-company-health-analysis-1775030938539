@@ -18,6 +18,7 @@ import {
   hasSocialSignals,
 } from '@/hooks/use-company-aggregates'
 import { EmailVerificationBanner } from '@/components/auth/email-verification-banner'
+import { DashboardNotificationsPanel } from '@/components/notifications/dashboard-notifications-panel'
 import { useAuth } from '@/contexts/auth-context'
 import { useVerificationResend } from '@/hooks/use-verification-resend'
 import { buildCompletenessSlices, completenessPercent, healthSubscores } from '@/lib/dashboard-utils'
@@ -207,6 +208,8 @@ export function DashboardPage() {
       </div>
 
       <HealthTrendChart data={chartData.length > 0 ? chartData : undefined} />
+
+      <DashboardNotificationsPanel />
 
       <SyncHistoryPanel jobs={jobs ?? []} isLoading={jobsLoading} />
 

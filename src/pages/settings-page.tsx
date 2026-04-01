@@ -17,6 +17,7 @@ import { useIntegrations, useEnsureIntegrationMutation } from '@/hooks/use-integ
 import { useSyncJobs } from '@/hooks/use-sync-jobs'
 import { csvImportRequest, integrationOAuthExchange } from '@/api/integration-functions'
 import { supabase } from '@/lib/supabase'
+import { SettingsNotificationsPanel } from '@/components/notifications/settings-notifications-panel'
 
 const csvSchema = z.object({
   csvText: z.string().min(3, 'Paste at least one row'),
@@ -136,6 +137,8 @@ export function SettingsPage() {
           <Link to="/profile">Open profile</Link>
         </Button>
       </Card>
+
+      {supabase ? <SettingsNotificationsPanel /> : null}
 
       <div>
         <h2 className="mb-2 text-xl font-semibold">Integrations</h2>

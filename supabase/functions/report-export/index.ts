@@ -7,6 +7,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from 'https://esm.sh/zod@3.23.8'
 import { corsHeaders } from '../_shared/cors.ts'
 import { asRecord } from '../_shared/safe-json.ts'
+import { createUserNotification } from '../_shared/pulse-notify.ts'
+import { sendTemplatedEmailIfEnabled } from '../_shared/transactional-email.ts'
 import { buildReportHtmlDocument, buildReportPdfBytes, type ReportPdfSections } from '../_shared/report-pdf.ts'
 
 const sectionKeySchema = z.enum([
@@ -278,6 +280,34 @@ serve(async (req) => {
       })
 
       const signed = await admin.storage.from('report-exports').createSignedUrl(storagePath, 3600)
+      const exportUrl = signed.data?.signedUrl ?? ''
+
+      await createUserNotification(admin, {
+        userId: user.id,
+        type: 'export_ready',
+        message: `Export for ${companyName} is ready (${format.toUpperCase()}). Download from the export screen.`,
+        data: { exportId, reportId, companyId, format, signedUrl: exportUrl },
+      })
+
+      const exportDisplayName =
+        typeof user.user_metadata?.display_name === 'string'
+          ? user.user_metadata.display_name
+          : typeof user.email === 'string'
+            ? user.email.split('@')[0] ?? 'there'
+            : 'there'
+      const appUrl = (Deno.env.get('PUBLIC_APP_URL') ?? Deno.env.get('SITE_URL') ?? '').replace(/\/$/, '')
+      const exportPage = appUrl ? `${appUrl}/export/${reportId}` : `/export/${reportId}`
+      await sendTemplatedEmailIfEnabled({
+        admin,
+        userId: user.id,
+        templateType: 'export_ready',
+        placeholders: {
+          userName: exportDisplayName,
+          companyName,
+          exportUrl: exportUrl || exportPage,
+        },
+        metadata: { exportId, reportId, companyId },
+      })
 
       return new Response(
         JSON.stringify({
@@ -302,6 +332,13 @@ serve(async (req) => {
           updated_at: new Date().toISOString(),
         })
         .eq('id', exportId)
+
+      await createUserNotification(admin, {
+        userId: user.id,
+        type: 'job_failed',
+        message: `Report export failed: ${message}`,
+        data: { exportId, reportId, companyId, error: message },
+      })
 
       return new Response(JSON.stringify({ error: message, exportId }), {
         status: 502,

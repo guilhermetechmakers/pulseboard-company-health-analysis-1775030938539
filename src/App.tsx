@@ -26,6 +26,7 @@ import {
   PasswordResetRequestPage,
   PasswordResetConfirmPage,
   NotFoundPage,
+  NotificationsPage,
 } from '@/pages'
 
 const queryClient = new QueryClient({
@@ -77,6 +78,7 @@ export default function App() {
               <Route path="/export/:id" element={<Guard><ExportSettingsPage /></Guard>} />
               <Route path="/profile" element={<Guard><UserProfilePage /></Guard>} />
               <Route path="/settings" element={<Guard><SettingsPage /></Guard>} />
+              <Route path="/notifications" element={<Guard><NotificationsPage /></Guard>} />
               <Route path="/admin/users" element={<Guard><AdminUsersPage /></Guard>} />
               <Route path="/admin" element={<Guard><AdminDashboardPage /></Guard>} />
               <Route path="*" element={<NotFoundPage />} />

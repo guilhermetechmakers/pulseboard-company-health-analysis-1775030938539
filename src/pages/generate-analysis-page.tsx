@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PageTemplate } from '@/components/layout/page-template'
-import { Progress } from '@/components/ui/progress'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { AiAnalysisComposer } from '@/components/analysis/ai-analysis-composer'
-import { ProgressStepper } from '@/components/analysis/progress-stepper'
+import { GenerateAnalysisStatus } from '@/components/analysis/generate-analysis-status'
 import { useCompanyAnalysisContext, useCompleteness, useRunAnalysis } from '@/hooks/use-analysis'
 import { useMyCompany } from '@/hooks/use-my-company'
 import { supabase } from '@/lib/supabase'
@@ -140,17 +139,12 @@ export function GenerateAnalysisPage() {
             }}
           />
 
-          {runAnalysis.isPending ? (
-            <Card className="space-y-4 p-4 animate-fade-in-up">
-              <ProgressStepper steps={STEPS} activeIndex={stepIndex} />
-              <div className="space-y-2">
-                <Progress value={simulatedProgress} />
-                <p className="text-xs text-muted-foreground motion-reduce:transition-none">
-                  Estimated time depends on model load. You can leave this page — the report will appear in history when complete.
-                </p>
-              </div>
-            </Card>
-          ) : null}
+          <GenerateAnalysisStatus
+            steps={STEPS}
+            activeIndex={stepIndex}
+            progressValue={simulatedProgress}
+            isVisible={runAnalysis.isPending}
+          />
         </div>
       </div>
     </PageTemplate>

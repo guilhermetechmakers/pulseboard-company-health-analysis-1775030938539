@@ -4,7 +4,7 @@ import { PageTemplate } from '@/components/layout/page-template'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ReportEditorBlock } from '@/components/analysis/report-editor-block'
+import { ReportViewerEditorBlock } from '@/components/analysis/report-viewer-editor-block'
 import { SnapshotManager } from '@/components/analysis/snapshot-manager'
 import { useCreateReportSnapshot, useReport, useReportSnapshots, useUpdateReportSections } from '@/hooks/use-analysis'
 import { supabase } from '@/lib/supabase'
@@ -154,7 +154,7 @@ export function ReportViewerPage() {
         </TabsList>
 
         <TabsContent value="sections" className="space-y-4">
-          <ReportEditorBlock
+          <ReportViewerEditorBlock
             title="Executive summary"
             value={exec}
             isSaving={updateReport.isPending}
@@ -163,7 +163,7 @@ export function ReportViewerPage() {
               await updateReport.mutateAsync({ reportId: report.id, patch: { executive_summary: next } })
             }}
           />
-          <ReportEditorBlock
+          <ReportViewerEditorBlock
             title="Financial analysis"
             value={fin}
             isSaving={updateReport.isPending}
@@ -172,7 +172,7 @@ export function ReportViewerPage() {
               await updateReport.mutateAsync({ reportId: report.id, patch: { financial_analysis: next } })
             }}
           />
-          <ReportEditorBlock
+          <ReportViewerEditorBlock
             title="Market analysis"
             value={market}
             isSaving={updateReport.isPending}
@@ -181,7 +181,7 @@ export function ReportViewerPage() {
               await updateReport.mutateAsync({ reportId: report.id, patch: { market_analysis: next } })
             }}
           />
-          <ReportEditorBlock
+          <ReportViewerEditorBlock
             title="Social & brand analysis"
             value={social}
             isSaving={updateReport.isPending}

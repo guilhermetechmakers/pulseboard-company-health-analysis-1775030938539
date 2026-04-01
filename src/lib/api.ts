@@ -68,4 +68,6 @@ export {
   invokeAnalyzeCompanyHealth,
   invokeReportExport,
   invokeExportDownloadUrl,
+  invokeEmailSend,
+  invokeEmailRetry,
 } from '@/lib/supabase-functions'

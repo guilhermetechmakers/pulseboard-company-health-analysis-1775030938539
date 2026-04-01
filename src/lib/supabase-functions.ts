@@ -210,3 +210,131 @@ export async function invokeExportDownloadUrl(input: {
 
   return json as { data: ExportDownloadUrlResponseData }
 }
+
+export async function invokeEmailSend(body: {
+  templateType: 'verification' | 'password_reset' | 'analysis_complete' | 'export_ready' | 'billing_alert' | 'job_failed'
+  placeholders?: Record<string, string>
+}): Promise<{ data: { sent: boolean; skipped: boolean; reason: string | null; dispatchId: string | null } }> {
+  if (!supabase) {
+    throw new Error('Supabase is not configured')
+  }
+  const url = import.meta.env.VITE_SUPABASE_URL
+  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
+  if (!url || !anon) {
+    throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
+  }
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  if (!session?.access_token) {
+    throw new Error('Sign in required')
+  }
+  const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/email-send`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      apikey: anon,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ templateType: body.templateType, placeholders: body.placeholders ?? {} }),
+  })
+  const json = (await res.json()) as {
+    data?: { sent: boolean; skipped: boolean; reason: string | null; dispatchId: string | null }
+    error?: unknown
+  }
+  if (!res.ok) {
+    const errMsg = typeof json.error === 'string' ? json.error : JSON.stringify(json.error ?? res.status)
+    throw new Error(errMsg)
+  }
+  if (!json.data) {
+    throw new Error('Invalid response from email-send')
+  }
+  return { data: json.data }
+}
+
+export async function invokeEmailRetry(outboundId: string): Promise<{ data: { ok: boolean; dispatchId: string | null } }> {
+  if (!supabase) {
+    throw new Error('Supabase is not configured')
+  }
+  const url = import.meta.env.VITE_SUPABASE_URL
+  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
+  if (!url || !anon) {
+    throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
+  }
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  if (!session?.access_token) {
+    throw new Error('Sign in required')
+  }
+  const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/email-retry`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      apikey: anon,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ outboundId }),
+  })
+  const json = (await res.json()) as { data?: { ok: boolean; dispatchId: string | null }; error?: unknown }
+  if (!res.ok) {
+    const errMsg = typeof json.error === 'string' ? json.error : JSON.stringify(json.error ?? res.status)
+    throw new Error(errMsg)
+  }
+  if (!json.data) {
+    throw new Error('Invalid response from email-retry')
+  }
+  return { data: json.data }
+}
+
+export type SendTransactionalEmailBody = {
+  templateType: string
+  placeholders?: Record<string, string>
+}
+
+/** Authenticated Resend send via Edge Function (honors notification email preferences). */
+export async function invokeSendTransactionalEmail(
+  body: SendTransactionalEmailBody,
+): Promise<{ data: Record<string, unknown> }> {
+  if (!supabase) {
+    throw new Error('Supabase is not configured')
+  }
+
+  const url = import.meta.env.VITE_SUPABASE_URL
+  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
+  if (!url || !anon) {
+    throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  if (!session?.access_token) {
+    throw new Error('Sign in required')
+  }
+
+  const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/send-transactional-email`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      apikey: anon,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+
+  const json = (await res.json()) as { data?: Record<string, unknown>; error?: unknown }
+
+  if (!res.ok) {
+    const errMsg =
+      typeof json.error === 'string'
+        ? json.error
+        : json.error !== undefined
+          ? JSON.stringify(json.error)
+          : `Email request failed (${res.status})`
+    throw new Error(errMsg)
+  }
+
+  return { data: json.data ?? {} }
+}

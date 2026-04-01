@@ -598,6 +598,132 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['user_mfa_settings']['Insert']>
         Relationships: []
       }
+      notifications: {
+        Row: {
+          id: string
+          user_id: string
+          type: string
+          message: string
+          data: Record<string, unknown>
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          type: string
+          message: string
+          data?: Record<string, unknown>
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['notifications']['Insert']>
+        Relationships: []
+      }
+      notification_inbox_items: {
+        Row: {
+          id: string
+          user_id: string
+          notification_id: string
+          read_at: string | null
+          archived: boolean
+          deleted_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          notification_id: string
+          read_at?: string | null
+          archived?: boolean
+          deleted_at?: string | null
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['notification_inbox_items']['Insert']>
+        Relationships: []
+      }
+      email_templates: {
+        Row: {
+          id: string
+          type: string
+          subject: string
+          body_html: string
+          body_text: string
+          placeholders: unknown[]
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          type: string
+          subject: string
+          body_html: string
+          body_text: string
+          placeholders?: unknown[]
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['email_templates']['Insert']>
+        Relationships: []
+      }
+      email_dispatches: {
+        Row: {
+          id: string
+          user_id: string
+          resend_email_id: string | null
+          template_type: string
+          to_address: string
+          subject: string
+          status: string
+          last_error: string | null
+          metadata: Record<string, unknown>
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          resend_email_id?: string | null
+          template_type: string
+          to_address: string
+          subject: string
+          status?: string
+          last_error?: string | null
+          metadata?: Record<string, unknown>
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['email_dispatches']['Insert']>
+        Relationships: []
+      }
+      email_events: {
+        Row: {
+          id: string
+          dispatch_id: string | null
+          status: string
+          event_at: string
+          payload: Record<string, unknown>
+        }
+        Insert: {
+          id?: string
+          dispatch_id?: string | null
+          status: string
+          event_at?: string
+          payload?: Record<string, unknown>
+        }
+        Update: Partial<Database['public']['Tables']['email_events']['Insert']>
+        Relationships: []
+      }
+      notification_preferences: {
+        Row: {
+          user_id: string
+          channels: Record<string, unknown>
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          channels?: Record<string, unknown>
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['notification_preferences']['Insert']>
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>

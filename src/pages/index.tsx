@@ -17,6 +17,7 @@ export { VerifyEmailPage } from '@/pages/verify-email-page'
 export { PasswordResetRequestPage } from '@/pages/password-reset-request-page'
 export { PasswordResetConfirmPage } from '@/pages/password-reset-confirm-page'
 export { UserProfilePage } from '@/pages/user-profile-page'
+export { NotificationsPage } from '@/pages/notifications-page'
 
 function sectionCard(title: string, text: string) {
   return (

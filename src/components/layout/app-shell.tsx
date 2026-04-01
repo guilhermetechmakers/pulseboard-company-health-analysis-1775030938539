@@ -3,6 +3,7 @@ import { Link, NavLink } from 'react-router-dom'
 import { LayoutDashboard, FileText, LogIn, LogOut, UserRound } from 'lucide-react'
 import { useAuth } from '@/contexts/auth-context'
 import { Button } from '@/components/ui/button'
+import { NotificationBell } from '@/components/notifications/notification-bell'
 import { cn } from '@/lib/utils'
 
 const links = [
@@ -44,6 +45,7 @@ export function AppShell({ children }: PropsWithChildren) {
             </Link>
             {session ? (
               <>
+                <NotificationBell />
                 <Link
                   to="/profile"
                   className="inline-flex items-center gap-1 font-medium text-foreground hover:text-primary"

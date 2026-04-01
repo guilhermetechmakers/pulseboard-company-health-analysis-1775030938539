@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
+import { createInAppNotificationRow } from '@/api/notifications'
 import { invokeAnalyzeCompanyHealth } from '@/lib/supabase-functions'
 import { buildCompletenessFields, completenessPercent } from '@/lib/analysis-completeness'
 import type { AnalysisDepth, AnalyzeCompanyRequest, ReportRow, ReportSnapshotRow } from '@/types/analysis'
@@ -122,6 +123,7 @@ export function useRunAnalysis() {
     },
     onSuccess: async (_res, vars) => {
       toast.success('Analysis completed')
+      await queryClient.invalidateQueries({ queryKey: ['pulse-notifications'] })
       await queryClient.invalidateQueries({ queryKey: ['company-reports', vars.companyId] })
       await queryClient.invalidateQueries({ queryKey: ['company-aggregates', vars.companyId] })
       await queryClient.invalidateQueries({ queryKey: ['company', 'mine'] })
@@ -174,6 +176,16 @@ export function useCreateReportSnapshot() {
     },
     onSuccess: async (_d, vars) => {
       toast.success('Snapshot saved')
+      try {
+        await createInAppNotificationRow({
+          type: 'snapshot_created',
+          message: `Snapshot “${vars.label}” saved for this report.`,
+          data: { reportId: vars.reportId, label: vars.label },
+        })
+      } catch {
+        /* non-blocking */
+      }
+      await queryClient.invalidateQueries({ queryKey: ['pulse-notifications'] })
       await queryClient.invalidateQueries({ queryKey: ['report-snapshots', vars.reportId] })
     },
     onError: (e: Error) => toast.error(e.message ?? 'Snapshot failed'),
