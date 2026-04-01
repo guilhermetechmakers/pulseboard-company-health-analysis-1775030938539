@@ -59,6 +59,9 @@ export function RequireCompanyRoute({ children }: RequireCompanyRouteProps) {
   }
 
   if (!companyId) {
+    if (location.pathname.startsWith('/dashboard')) {
+      return <>{children}</>
+    }
     return (
       <Navigate
         to="/company/create"

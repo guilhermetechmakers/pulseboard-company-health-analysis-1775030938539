@@ -86,6 +86,7 @@ export {
   invokePulseDataIo,
   invokePulseCompanyApi,
   invokePulseCompaniesApi,
+  invokePulseDashboardApi,
   invokePulseActiveCompany,
   pulseDataIoImportCsv,
   pulseDataIoImportStatus,

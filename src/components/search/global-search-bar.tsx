@@ -12,6 +12,11 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { SearchHighlight } from '@/components/search/search-highlight'
 
+export interface GlobalSearchBarProps {
+  placeholder?: string
+  className?: string
+}
+
 type SuggestCacheEntry = { at: number; data: Awaited<ReturnType<typeof autosuggestPulse>> }
 const suggestCache = new Map<string, SuggestCacheEntry>()
 const SUGGEST_TTL_MS = 45_000
@@ -29,7 +34,7 @@ function sectionLabel(type: SearchItem['type']): string {
   return searchI18n.sectionUsers
 }
 
-export function GlobalSearchBar() {
+export function GlobalSearchBar({ placeholder, className }: GlobalSearchBarProps = {}) {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { data: profile } = useUserProfile(user?.id)
@@ -129,7 +134,7 @@ export function GlobalSearchBar() {
   }, [debounced, bundle])
 
   return (
-    <div ref={rootRef} className="relative w-full min-w-[200px] max-w-md flex-1">
+    <div ref={rootRef} className={cn('relative w-full min-w-[200px] max-w-md flex-1', className)}>
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
         <Input
@@ -140,7 +145,7 @@ export function GlobalSearchBar() {
           aria-controls={listId}
           aria-autocomplete="list"
           aria-activedescendant={open && flat[activeIndex] ? `suggest-${flat[activeIndex].id}` : undefined}
-          placeholder={searchI18n.globalPlaceholder}
+          placeholder={placeholder ?? searchI18n.globalPlaceholder}
           className="h-10 border-border pl-9 pr-20 transition-shadow duration-200 focus-visible:ring-2 focus-visible:ring-primary/40"
           value={value}
           onChange={(ev) => {

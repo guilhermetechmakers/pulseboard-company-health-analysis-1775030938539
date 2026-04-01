@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { invokeComputeHealthScore } from '@/lib/supabase-functions'
 import { QUERY_STALE_MS } from '@/constants/cache-policy'
+import { dashboardOverviewQueryKey } from '@/hooks/use-dashboard-overview'
 import { fetchCompanyHealthScoresFromSupabase } from '@/lib/company-data-fetch'
 import { fireAndForgetInvalidateCompanyCache, invokePulseCacheApi } from '@/lib/pulse-cache-api'
 import type { CompanyHealthScoreRow, CompanyInputSnapshotRow } from '@/types/health-score'
@@ -67,6 +68,7 @@ export function useComputeHealthScore() {
       await queryClient.invalidateQueries({ queryKey: ['company-health-scores', vars.companyId] })
       await queryClient.invalidateQueries({ queryKey: ['company', 'mine'] })
       await queryClient.invalidateQueries({ queryKey: ['company-aggregates', vars.companyId] })
+      await queryClient.invalidateQueries({ queryKey: dashboardOverviewQueryKey(vars.companyId) })
     },
     onError: (e: Error) => toast.error(e.message ?? 'Could not compute health score'),
   })

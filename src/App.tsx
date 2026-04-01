@@ -83,8 +83,8 @@ export default function App() {
                   <Route path="/password-reset/:token" element={<PasswordResetConfirmPage />} />
                   <Route path="/reset-password" element={<Navigate to="/password-reset" replace />} />
 
-                  <Route path="/dashboard" element={<Workspace><DashboardPage /></Workspace>} />
-                  <Route path="/dashboard/overview" element={<Workspace><DashboardPage /></Workspace>} />
+                  <Route path="/dashboard" element={<Guard><DashboardPage /></Guard>} />
+                  <Route path="/dashboard/overview" element={<Guard><DashboardPage /></Guard>} />
                   <Route path="/dashboard/analytics" element={<Workspace><CompanyDetailPage /></Workspace>} />
                   <Route path="/dashboard/settings" element={<Workspace><SettingsPage /></Workspace>} />
                   <Route path="/dashboard/users" element={<Guard><Navigate to="/admin/users" replace /></Guard>} />

@@ -5,6 +5,7 @@ import { createInAppNotificationRow } from '@/api/notifications'
 import { invokeAnalyzeCompanyHealth } from '@/lib/supabase-functions'
 import { buildCompletenessFields, completenessPercent } from '@/lib/analysis-completeness'
 import { QUERY_STALE_MS } from '@/constants/cache-policy'
+import { dashboardOverviewQueryKey } from '@/hooks/use-dashboard-overview'
 import {
   fetchCompanyReportsFromSupabase,
   fetchReportFromSupabase,
@@ -191,6 +192,7 @@ export function useRunAnalysis() {
       await queryClient.invalidateQueries({ queryKey: ['company', 'mine'] })
       await queryClient.invalidateQueries({ queryKey: ['company-health-scores', vars.companyId] })
       await queryClient.invalidateQueries({ queryKey: ['company-activity-feed'] })
+      await queryClient.invalidateQueries({ queryKey: dashboardOverviewQueryKey(vars.companyId) })
     },
     onError: (e: Error) => {
       toast.error(e.message ?? 'Analysis failed')

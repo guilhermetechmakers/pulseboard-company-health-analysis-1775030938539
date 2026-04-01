@@ -1,6 +1,7 @@
 import { buildAuthenticatedEdgeHeaders } from '@/lib/pulseboard-request-headers'
 import { supabase } from '@/lib/supabase'
 import type { AnalyzeCompanyRequest } from '@/types/analysis'
+import type { DashboardOverviewResponse } from '@/types/dashboard'
 import type { ExportDownloadUrlResponseData, ReportExportResponseData } from '@/types/export'
 import type {
   PulseDataIoExportDownloadResponse,
@@ -78,6 +79,72 @@ export async function invokeComputeHealthScore(body: {
   }
 
   return json as ComputeHealthScoreResponse
+}
+
+/** Dashboard aggregation (`pulse-dashboard-api` Edge Function). Mirrors product surface `POST /api/dashboard/:companyId/overview`. */
+export async function invokePulseDashboardApi(input: {
+  companyId: string
+}): Promise<DashboardOverviewResponse> {
+  if (!supabase) {
+    throw new Error('Supabase is not configured')
+  }
+
+  const url = import.meta.env.VITE_SUPABASE_URL
+  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
+  if (!url || !anon) {
+    throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
+  }
+
+  const headers = await buildAuthenticatedEdgeHeaders()
+  if (!headers.Authorization?.startsWith('Bearer ')) {
+    throw new Error('Sign in required')
+  }
+
+  const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/pulse-dashboard-api`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ op: 'overview' as const, companyId: input.companyId }),
+  })
+
+  const json = (await res.json()) as DashboardOverviewResponse & { error?: unknown }
+
+  if (!res.ok) {
+    const errMsg =
+      typeof json.error === 'string'
+        ? json.error
+        : json.error !== undefined
+          ? JSON.stringify(json.error)
+          : `Dashboard overview failed (${res.status})`
+    throw new Error(errMsg)
+  }
+
+  if (!json.data?.company?.id) {
+    throw new Error('Invalid response from dashboard API')
+  }
+
+  const fs = json.data.financialSnapshot
+  const financialSnapshot =
+    fs !== null && typeof fs === 'object' && !Array.isArray(fs)
+      ? {
+          revenue: typeof fs.revenue === 'number' ? fs.revenue : null,
+          profit: typeof fs.profit === 'number' ? fs.profit : null,
+          cash: typeof fs.cash === 'number' ? fs.cash : null,
+        }
+      : null
+
+  return {
+    data: {
+      company: json.data.company,
+      recentReports: Array.isArray(json.data.recentReports) ? json.data.recentReports : [],
+      healthSparkline: Array.isArray(json.data.healthSparkline) ? json.data.healthSparkline : [],
+      integrations: Array.isArray(json.data.integrations) ? json.data.integrations : [],
+      unreadInboxCount:
+        typeof json.data.unreadInboxCount === 'number' && Number.isFinite(json.data.unreadInboxCount)
+          ? json.data.unreadInboxCount
+          : 0,
+      financialSnapshot,
+    },
+  }
 }
 
 export async function invokeAnalyzeCompanyHealth(

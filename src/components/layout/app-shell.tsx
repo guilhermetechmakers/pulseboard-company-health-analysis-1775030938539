@@ -1,6 +1,6 @@
 import type { PropsWithChildren } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { LayoutDashboard, FileText, LogIn, LogOut, UserRound, Building2, Shuffle } from 'lucide-react'
+import { LayoutDashboard, FileText, LogIn, Building2, Shuffle } from 'lucide-react'
 import { GlobalSearchBar } from '@/components/search/global-search-bar'
 import { useAuth } from '@/contexts/auth-context'
 import { useUserProfile } from '@/hooks/use-auth-profile'
@@ -8,6 +8,7 @@ import { useMyCompany } from '@/hooks/use-my-company'
 import { ActiveCompanyBanner } from '@/components/layout/active-company-banner'
 import { Button } from '@/components/ui/button'
 import { NotificationBell } from '@/components/notifications/notification-bell'
+import { ProfileMenu } from '@/components/layout/profile-menu'
 import { cn } from '@/lib/utils'
 
 const baseLinks = [
@@ -23,7 +24,7 @@ const baseLinks = [
 ]
 
 export function AppShell({ children }: PropsWithChildren) {
-  const { session, signOut, isConfigured, user } = useAuth()
+  const { session, isConfigured, user } = useAuth()
   const { data: profile } = useUserProfile(user?.id)
   const { data: myCompany } = useMyCompany()
   const isAdmin = profile?.role === 'admin' && profile?.account_status !== 'suspended'
@@ -99,22 +100,7 @@ export function AppShell({ children }: PropsWithChildren) {
             {session ? (
               <>
                 <NotificationBell />
-                <Link
-                  to="/profile"
-                  className="inline-flex items-center gap-1 font-medium text-foreground hover:text-primary"
-                >
-                  <UserRound className="h-4 w-4" aria-hidden />
-                  Profile
-                </Link>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="h-9 gap-1 px-2 text-muted-foreground"
-                  onClick={() => void signOut()}
-                >
-                  <LogOut className="h-4 w-4" aria-hidden />
-                  Sign out
-                </Button>
+                <ProfileMenu />
               </>
             ) : (
               <Button type="button" variant="secondary" className="h-9 gap-1 px-3" asChild>

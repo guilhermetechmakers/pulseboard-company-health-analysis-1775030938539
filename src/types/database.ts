@@ -18,6 +18,7 @@ export interface Database {
           onboarding_complete: boolean
           health_scores: Record<string, unknown>
           search_tags: string[]
+          last_analysis_at: string | null
           created_at: string
           updated_at: string
         }
@@ -37,6 +38,7 @@ export interface Database {
           onboarding_complete?: boolean
           health_scores?: Record<string, unknown>
           search_tags?: string[]
+          last_analysis_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -54,6 +56,7 @@ export interface Database {
           onboarding_complete?: boolean
           health_scores?: Record<string, unknown>
           search_tags?: string[]
+          last_analysis_at?: string | null
           updated_at?: string
         }
         Relationships: []
