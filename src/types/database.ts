@@ -11,8 +11,11 @@ export interface Database {
           website: string | null
           business_model: string | null
           target_customer: string | null
+          target_customers: string | null
           goals: string | null
           products: string | null
+          products_services: string[]
+          onboarding_complete: boolean
           health_scores: Record<string, unknown>
           search_tags: string[]
           created_at: string
@@ -27,8 +30,11 @@ export interface Database {
           website?: string | null
           business_model?: string | null
           target_customer?: string | null
+          target_customers?: string | null
           goals?: string | null
           products?: string | null
+          products_services?: string[]
+          onboarding_complete?: boolean
           health_scores?: Record<string, unknown>
           search_tags?: string[]
           created_at?: string
@@ -41,11 +47,111 @@ export interface Database {
           website?: string | null
           business_model?: string | null
           target_customer?: string | null
+          target_customers?: string | null
           goals?: string | null
           products?: string | null
+          products_services?: string[]
+          onboarding_complete?: boolean
           health_scores?: Record<string, unknown>
           search_tags?: string[]
           updated_at?: string
+        }
+        Relationships: []
+      }
+      onboarding_drafts: {
+        Row: {
+          id: string
+          user_id: string
+          data: Record<string, unknown>
+          step: number
+          last_saved_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          data?: Record<string, unknown>
+          step?: number
+          last_saved_at?: string
+          created_at?: string
+        }
+        Update: {
+          data?: Record<string, unknown>
+          step?: number
+          last_saved_at?: string
+        }
+        Relationships: []
+      }
+      analysis_history: {
+        Row: {
+          id: string
+          company_id: string
+          run_at: string
+          summary: string
+          details: Record<string, unknown>
+          report_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          run_at?: string
+          summary?: string
+          details?: Record<string, unknown>
+          report_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          summary?: string
+          details?: Record<string, unknown>
+          report_id?: string | null
+        }
+        Relationships: []
+      }
+      admin_consolidations: {
+        Row: {
+          id: string
+          user_id: string
+          source_company_id: string
+          target_company_id: string
+          status: string
+          dry_run: boolean
+          metadata: Record<string, unknown>
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          source_company_id: string
+          target_company_id: string
+          status?: string
+          dry_run?: boolean
+          metadata?: Record<string, unknown>
+          created_at?: string
+        }
+        Update: {
+          status?: string
+          metadata?: Record<string, unknown>
+        }
+        Relationships: []
+      }
+      telemetry_events: {
+        Row: {
+          id: string
+          user_id: string
+          event_type: string
+          payload: Record<string, unknown>
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          event_type: string
+          payload?: Record<string, unknown>
+          created_at?: string
+        }
+        Update: {
+          payload?: Record<string, unknown>
         }
         Relationships: []
       }

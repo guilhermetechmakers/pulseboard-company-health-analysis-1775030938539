@@ -20,6 +20,9 @@ type AdminAction =
   | 'audit_logs_create'
   | 'audit_logs_export'
   | 'audit_logs_stats'
+  | 'companies_multi_list'
+  | 'companies_merge'
+  | 'companies_migrate_dry_run'
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -881,6 +884,176 @@ serve(async (req) => {
       return json({ data: { url } })
     }
 
+    if (action === 'companies_multi_list') {
+      const { data: rows, error } = await supabaseAdmin.from('v_users_multiple_companies').select('*')
+      if (error) throw new Error(error.message)
+      const list = Array.isArray(rows) ? rows : []
+      return json({
+        data: {
+          users: list.map((r) => {
+            const rec = isRecord(r) ? r : {}
+            const uid = typeof rec.user_id === 'string' ? rec.user_id : ''
+            const cnt = typeof rec.company_count === 'number' ? rec.company_count : num(rec.company_count, 0)
+            const idsRaw = rec.company_ids
+            const companyIds = Array.isArray(idsRaw)
+              ? idsRaw.filter((x): x is string => typeof x === 'string')
+              : []
+            return { userId: uid, companyCount: cnt, companyIds }
+          }),
+        },
+      })
+    }
+
+    if (action === 'companies_migrate_dry_run') {
+      const { data: rows, error } = await supabaseAdmin.from('v_users_multiple_companies').select('*')
+      if (error) throw new Error(error.message)
+      const list = Array.isArray(rows) ? rows : []
+      const preview = list.map((r) => {
+        const rec = isRecord(r) ? r : {}
+        return {
+          userId: typeof rec.user_id === 'string' ? rec.user_id : '',
+          companyCount: num(rec.company_count, 0),
+          companyIds: Array.isArray(rec.company_ids)
+            ? rec.company_ids.filter((x): x is string => typeof x === 'string')
+            : [],
+          proposedAction: 'merge_required',
+        }
+      })
+      await supabaseAdmin.from('audit_logs').insert({
+        actor_user_id: adminId,
+        action: 'company_migrate_dry_run',
+        entity: 'admin_consolidation',
+        entity_id: null,
+        metadata: { previewCount: preview.length, dryRun: true },
+        notes: 'Admin migration dry-run executed',
+      })
+      await supabaseAdmin.from('admin_actions').insert({
+        admin_id: adminId,
+        action: 'companies_migrate_dry_run',
+        target_user_id: null,
+        metadata: { count: preview.length },
+      })
+      return json({ data: { dryRun: true, preview } })
+    }
+
+    if (action === 'companies_merge') {
+      const sourceId = str(body.sourceCompanyId)
+      const targetId = str(body.targetCompanyId)
+      const dryRun = body.dryRun === true
+      if (!sourceId || !targetId || !isUuid(sourceId) || !isUuid(targetId)) {
+        return json(
+          {
+            error: 'Invalid payload',
+            code: 'VALIDATION_ERROR',
+            remediation: 'Provide valid sourceCompanyId and targetCompanyId UUIDs.',
+          },
+          422,
+        )
+      }
+      if (sourceId === targetId) {
+        return json({ error: 'Source and target must differ', code: 'INVALID_MERGE' }, 422)
+      }
+
+      const { data: srcRow, error: srcErr } = await supabaseAdmin
+        .from('companies')
+        .select('id, user_id')
+        .eq('id', sourceId)
+        .maybeSingle()
+      const { data: tgtRow, error: tgtErr } = await supabaseAdmin
+        .from('companies')
+        .select('id, user_id')
+        .eq('id', targetId)
+        .maybeSingle()
+      if (srcErr || tgtErr) throw new Error(srcErr?.message ?? tgtErr?.message ?? 'Lookup failed')
+      const srcUser = srcRow && isRecord(srcRow) ? (typeof srcRow.user_id === 'string' ? srcRow.user_id : '') : ''
+      const tgtUser = tgtRow && isRecord(tgtRow) ? (typeof tgtRow.user_id === 'string' ? tgtRow.user_id : '') : ''
+      if (!srcUser || !tgtUser || srcUser !== tgtUser) {
+        return json(
+          {
+            error: 'Companies must belong to the same user',
+            code: 'FORBIDDEN_MERGE',
+            remediation: 'Pick two companies owned by the same account.',
+          },
+          403,
+        )
+      }
+
+      if (dryRun) {
+        return json({
+          data: {
+            dryRun: true,
+            userId: srcUser,
+            sourceCompanyId: sourceId,
+            targetCompanyId: targetId,
+            message: 'No data changed. Run with dryRun:false to execute after review.',
+          },
+        })
+      }
+
+      const pkTables = [
+        'company_financials',
+        'company_analytics',
+        'company_social',
+        'company_billing',
+        'company_market_data',
+        'company_branding',
+      ] as const
+
+      for (const table of pkTables) {
+        const { data: tExist } = await supabaseAdmin.from(table).select('company_id').eq('company_id', targetId).maybeSingle()
+        const { data: sExist } = await supabaseAdmin.from(table).select('*').eq('company_id', sourceId).maybeSingle()
+        if (sExist && isRecord(sExist)) {
+          if (tExist) {
+            await supabaseAdmin.from(table).delete().eq('company_id', sourceId)
+          } else {
+            const { error: uerr } = await supabaseAdmin.from(table).update({ company_id: targetId }).eq('company_id', sourceId)
+            if (uerr) throw new Error(uerr.message)
+          }
+        }
+      }
+
+      await supabaseAdmin.from('integrations').update({ company_id: targetId }).eq('company_id', sourceId)
+      await supabaseAdmin.from('integration_credentials').update({ company_id: targetId }).eq('company_id', sourceId)
+      await supabaseAdmin.from('reports').update({ company_id: targetId }).eq('company_id', sourceId)
+      await supabaseAdmin.from('company_health_scores').update({ company_id: targetId }).eq('company_id', sourceId)
+      await supabaseAdmin.from('analysis_history').update({ company_id: targetId }).eq('company_id', sourceId)
+
+      const { error: delErr } = await supabaseAdmin.from('companies').delete().eq('id', sourceId)
+      if (delErr) throw new Error(delErr.message)
+
+      await supabaseAdmin.from('admin_consolidations').insert({
+        user_id: srcUser,
+        source_company_id: sourceId,
+        target_company_id: targetId,
+        status: 'completed',
+        dry_run: false,
+        metadata: { mergedBy: adminId },
+      })
+      await supabaseAdmin.from('audit_logs').insert({
+        actor_user_id: adminId,
+        action: 'company_merge_completed',
+        entity: 'company',
+        entity_id: targetId,
+        metadata: { sourceCompanyId: sourceId, targetCompanyId: targetId, userId: srcUser },
+        notes: 'Admin consolidated duplicate companies',
+      })
+      await supabaseAdmin.from('admin_actions').insert({
+        admin_id: adminId,
+        action: 'companies_merge',
+        target_user_id: srcUser,
+        metadata: { sourceCompanyId: sourceId, targetCompanyId: targetId },
+      })
+
+      return json({
+        data: {
+          ok: true,
+          userId: srcUser,
+          removedCompanyId: sourceId,
+          keptCompanyId: targetId,
+        },
+      })
+    }
+
     return json({
       error: 'Unknown action',
       allowed: [
@@ -896,6 +1069,9 @@ serve(async (req) => {
         'audit_logs_create',
         'audit_logs_export',
         'audit_logs_stats',
+        'companies_multi_list',
+        'companies_merge',
+        'companies_migrate_dry_run',
       ],
     }, 400)
   } catch (e) {

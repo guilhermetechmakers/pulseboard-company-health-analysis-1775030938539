@@ -1,7 +1,7 @@
 /**
  * Admin platform API — calls `admin-api` Edge Function with session JWT; normalizes array fields.
  */
-import { invokeAdminApi } from '@/lib/supabase-functions'
+import { invokeAdminApi, invokePulseCompaniesApi } from '@/lib/supabase-functions'
 import type {
   AdminSystemHealth,
   AdminUsageMetrics,
@@ -195,4 +195,75 @@ export async function exportAdminUsers(body: AdminUserExportBody): Promise<Admin
   const inner = unwrapData(res)
   const url = isRecord(inner) && typeof inner.url === 'string' ? inner.url : ''
   return { url }
+}
+
+export type AdminMultiCompanyUser = {
+  userId: string
+  companyCount: number
+  companyIds: string[]
+}
+
+export async function fetchAdminMultiCompanyUsers(): Promise<AdminMultiCompanyUser[]> {
+  const res = await invokeAdminApi({ action: 'companies_multi_list' })
+  const inner = unwrapData(res)
+  const usersRaw = inner && isRecord(inner) ? inner.users : []
+  if (!Array.isArray(usersRaw)) return []
+  return usersRaw
+    .map((u) => {
+      const r = isRecord(u) ? u : {}
+      return {
+        userId: typeof r.userId === 'string' ? r.userId : '',
+        companyCount: typeof r.companyCount === 'number' ? r.companyCount : 0,
+        companyIds: Array.isArray(r.companyIds) ? r.companyIds.filter((x): x is string => typeof x === 'string') : [],
+      }
+    })
+    .filter((x) => x.userId.length > 0)
+}
+
+export async function runAdminCompaniesMigrateDryRun(): Promise<unknown> {
+  const res = await invokeAdminApi({ action: 'companies_migrate_dry_run' })
+  return unwrapData(res)
+}
+
+export async function mergeAdminCompanies(input: {
+  sourceCompanyId: string
+  targetCompanyId: string
+  dryRun?: boolean
+}): Promise<unknown> {
+  const res = await invokeAdminApi({
+    action: 'companies_merge',
+    sourceCompanyId: input.sourceCompanyId,
+    targetCompanyId: input.targetCompanyId,
+    dryRun: input.dryRun ?? false,
+  })
+  return unwrapData(res)
+}
+
+export type AdminTelemetryEventRow = {
+  id: string
+  user_id: string
+  event_type: string
+  payload: Record<string, unknown>
+  created_at: string
+}
+
+/** Product analytics surface: `GET /api/telemetry/events` equivalent via `pulse-companies-api`. */
+export async function fetchAdminTelemetryEvents(limit = 80): Promise<AdminTelemetryEventRow[]> {
+  const raw = await invokePulseCompaniesApi<{ data: { events: Record<string, unknown>[] } }>({
+    op: 'telemetry_list',
+    limit,
+  })
+  const events = raw?.data?.events
+  if (!Array.isArray(events)) return []
+  return events.map((e) => {
+    const r = isRecord(e) ? e : {}
+    const p = r.payload
+    return {
+      id: typeof r.id === 'string' ? r.id : String(r.id ?? ''),
+      user_id: typeof r.user_id === 'string' ? r.user_id : '',
+      event_type: typeof r.event_type === 'string' ? r.event_type : '',
+      payload: p !== null && typeof p === 'object' && !Array.isArray(p) ? (p as Record<string, unknown>) : {},
+      created_at: typeof r.created_at === 'string' ? r.created_at : '',
+    }
+  })
 }

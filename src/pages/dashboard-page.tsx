@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { BarChart3, FileDown, FileSpreadsheet, Plug, Sparkles } from 'lucide-react'
 import { differenceInHours, format, parseISO } from 'date-fns'
 import { Button } from '@/components/ui/button'
@@ -93,30 +93,7 @@ export function DashboardPage() {
   }))
 
   if (!companyLoading && !company) {
-    return (
-      <section className="space-y-8 animate-fade-in-up">
-        <EmailVerificationBanner
-          email={user?.email}
-          isVerified={isEmailVerified}
-          onResend={() => void resend()}
-          isResending={isSending}
-          cooldownSeconds={cooldown}
-        />
-        <div className="surface-card relative overflow-hidden p-10 text-center">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/5" />
-          <div className="relative space-y-4">
-            <h1 className="text-3xl font-semibold tracking-tight">Set up your company</h1>
-            <p className="mx-auto max-w-lg text-muted-foreground">
-              PulseBoard is single-company focused. Create a profile to unlock health scoring, integrations, and AI
-              analysis.
-            </p>
-            <Button asChild className="mt-2 shadow-card transition-all duration-200 hover:scale-[1.03] hover:shadow-lg">
-              <Link to="/company/create">Create company</Link>
-            </Button>
-          </div>
-        </div>
-      </section>
-    )
+    return <Navigate to="/company/create" replace />
   }
 
   return (

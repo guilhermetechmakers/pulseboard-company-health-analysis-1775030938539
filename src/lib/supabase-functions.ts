@@ -414,6 +414,94 @@ export async function invokeSendTransactionalEmail(
   return { data: json.data ?? {} }
 }
 
+/** Company API — guarded create + telemetry (`pulse-company-api` Edge Function). */
+export async function invokePulseCompanyApi(body: Record<string, unknown>): Promise<Record<string, unknown>> {
+  if (!supabase) {
+    throw new Error('Supabase is not configured')
+  }
+  const url = import.meta.env.VITE_SUPABASE_URL
+  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
+  if (!url || !anon) {
+    throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
+  }
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  if (!session?.access_token) {
+    throw new Error('Sign in required')
+  }
+  const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/pulse-company-api`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      apikey: anon,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+  const json = (await res.json()) as Record<string, unknown>
+  if (!res.ok) {
+    const err = json.error
+    const errMsg = typeof err === 'string' ? err : JSON.stringify(err ?? res.status)
+    const errObj = new Error(errMsg) as Error & { status?: number; body?: Record<string, unknown> }
+    errObj.status = res.status
+    errObj.body = json
+    throw errObj
+  }
+  return json
+}
+
+export type PulseCompaniesApiBody = Record<string, unknown> & { op: string }
+
+/** Company CRUD, drafts, completeness, telemetry (`pulse-companies-api` Edge Function). */
+export async function invokePulseCompaniesApi<T = unknown>(body: PulseCompaniesApiBody): Promise<T> {
+  if (!supabase) {
+    throw new Error('Supabase is not configured')
+  }
+  const url = import.meta.env.VITE_SUPABASE_URL
+  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
+  if (!url || !anon) {
+    throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
+  }
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  if (!session?.access_token) {
+    throw new Error('Sign in required')
+  }
+  const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/pulse-companies-api`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      apikey: anon,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+  const json = (await res.json()) as T & {
+    error?: string | Record<string, unknown>
+  }
+  if (!res.ok) {
+    const e = json.error
+    const msg =
+      typeof e === 'string'
+        ? e
+        : e !== undefined && typeof e === 'object' && 'message' in e && typeof (e as { message: unknown }).message === 'string'
+          ? (e as { message: string }).message
+          : JSON.stringify(e ?? res.status)
+    const err = new Error(msg) as Error & { status?: number; code?: string; remediation?: string }
+    err.status = res.status
+    if (e && typeof e === 'object' && 'code' in e && typeof (e as { code: unknown }).code === 'string') {
+      err.code = (e as { code: string }).code
+    }
+    if (e && typeof e === 'object' && 'remediation' in e && typeof (e as { remediation: unknown }).remediation === 'string') {
+      err.remediation = (e as { remediation: string }).remediation
+    }
+    throw err
+  }
+  return json as T
+}
+
 /** Admin platform (metrics, health, users, export). Requires profiles.role = admin. */
 export async function invokeAdminApi(body: Record<string, unknown>): Promise<Record<string, unknown>> {
   if (!supabase) {

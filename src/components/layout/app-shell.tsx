@@ -4,11 +4,12 @@ import { LayoutDashboard, FileText, LogIn, LogOut, UserRound } from 'lucide-reac
 import { GlobalSearchBar } from '@/components/search/global-search-bar'
 import { useAuth } from '@/contexts/auth-context'
 import { useUserProfile } from '@/hooks/use-auth-profile'
+import { useMyCompany } from '@/hooks/use-my-company'
 import { Button } from '@/components/ui/button'
 import { NotificationBell } from '@/components/notifications/notification-bell'
 import { cn } from '@/lib/utils'
 
-const links = [
+const baseLinks = [
   { to: '/', label: 'Landing', end: true },
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/company', label: 'Company' },
@@ -23,7 +24,12 @@ const links = [
 export function AppShell({ children }: PropsWithChildren) {
   const { session, signOut, isConfigured, user } = useAuth()
   const { data: profile } = useUserProfile(user?.id)
+  const { data: myCompany } = useMyCompany()
   const isAdmin = profile?.role === 'admin' && profile?.account_status !== 'suspended'
+  const links =
+    session && myCompany
+      ? (baseLinks ?? []).filter((l) => l.to !== '/company/create')
+      : (baseLinks ?? [])
 
   return (
     <div className="min-h-screen bg-muted/30">

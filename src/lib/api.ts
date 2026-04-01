@@ -74,6 +74,8 @@ export {
   invokeEmailSend,
   invokeEmailRetry,
   invokePulseDataIo,
+  invokePulseCompanyApi,
+  invokePulseCompaniesApi,
   pulseDataIoImportCsv,
   pulseDataIoImportStatus,
   pulseDataIoExportCsv,

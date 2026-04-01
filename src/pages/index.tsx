@@ -8,6 +8,7 @@ import { CompanyDetailPage } from '@/pages/company-detail-page'
 import { SettingsPage } from '@/pages/settings-page'
 
 export { DashboardPage, CompanyDetailPage, SettingsPage }
+export { CreateCompanyPage } from '@/pages/create-company-page'
 export { GenerateAnalysisPage } from '@/pages/generate-analysis-page'
 export { ReportViewerPage } from '@/pages/report-viewer-page'
 export { ExportSettingsPage } from '@/pages/export-settings-page'
@@ -54,10 +55,6 @@ export function LandingPage() {
   )
 }
 
-export const CreateCompanyPage = () => (
-  <PageTemplate title="Create company wizard" description="Profile -> Financials -> Market -> Social -> Review with autosave." />
-)
-
 export const FinancialsPage = () => (
   <PageTemplate title="Financials form" description="Revenue, expenses, margin, cash, debt, CAC/LTV, concentration, and uploads." />
 )
@@ -71,6 +68,7 @@ export const SocialBrandPage = () => (
 export { AdminDashboardPage } from '@/pages/admin-dashboard-page'
 export { AdminUsersPage } from '@/pages/admin-users-page'
 export { AdminAuditLogsPage } from '@/pages/admin-audit-logs-page'
+export { AdminCompanyConsolidationPage } from '@/pages/admin-company-consolidation-page'
 
 export function NotFoundPage() {
   return (

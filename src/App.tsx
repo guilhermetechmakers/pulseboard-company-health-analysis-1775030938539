@@ -24,6 +24,7 @@ import {
   AdminUsersPage,
   AdminDashboardPage,
   AdminAuditLogsPage,
+  AdminCompanyConsolidationPage,
   PasswordResetRequestPage,
   PasswordResetConfirmPage,
   NotFoundPage,
@@ -103,6 +104,7 @@ export default function App() {
                 <Route index element={<AdminDashboardPage />} />
                 <Route path="users" element={<AdminUsersPage />} />
                 <Route path="audit-logs" element={<AdminAuditLogsPage />} />
+                <Route path="company-consolidation" element={<AdminCompanyConsolidationPage />} />
               </Route>
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
