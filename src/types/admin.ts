@@ -41,11 +41,66 @@ export interface AdminUserRow {
   email: string
   name: string
   role: string
+  /** Mirrors `role` for table display; always guarded when mapping. */
+  roles?: string[]
   status: 'active' | 'suspended'
   createdAt: string
   lastLogin: string
+  lastActiveAt?: string
+  linkedCompanies?: string[]
   profile?: { avatarUrl: string | null }
 }
+
+export interface AdminUserDetailCompany {
+  id: string
+  name: string
+  via: 'owner' | 'member'
+  role?: string
+}
+
+export interface AdminUserActivityItem {
+  id: string
+  action: string
+  metadata: Record<string, unknown>
+  createdAt: string
+}
+
+export interface AdminUserDetailResponse {
+  user: {
+    id: string
+    email: string
+    name: string
+    role: string
+    roles: string[]
+    status: 'active' | 'suspended'
+    createdAt: string
+    lastLogin: string
+    linkedCompanies: AdminUserDetailCompany[]
+  }
+  activity: AdminUserActivityItem[]
+}
+
+export interface AdminImpersonateResponse {
+  impersonationToken: string
+  magicLink: string
+  expiresAt: string
+  targetUserId: string
+  message: string
+}
+
+export interface AdminCompanyPicklistItem {
+  id: string
+  name: string
+}
+
+export interface AdminExportJobStartResponse {
+  jobId: string
+}
+
+export type AdminExportJobStatusResponse =
+  | { status: 'pending' | 'processing' }
+  | { status: 'completed'; downloadUrl: string }
+  | { status: 'failed'; errorMessage: string }
 
 export interface AdminUsersListResponse {
   data: AdminUserRow[]
@@ -58,7 +113,12 @@ export interface AdminUserExportBody {
     role?: string
     status?: string
     createdAtRange?: { from?: string; to?: string }
+    createdFrom?: string
+    createdTo?: string
+    companyId?: string
   }
+  /** When starting a job-backed export. */
+  scope?: 'filtered' | 'full'
 }
 
 export interface AdminUserExportResponse {

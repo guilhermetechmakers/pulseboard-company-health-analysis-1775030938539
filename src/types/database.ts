@@ -1027,6 +1027,52 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['admin_actions']['Insert']>
         Relationships: []
       }
+      admin_impersonation_tokens: {
+        Row: {
+          id: string
+          admin_user_id: string
+          target_user_id: string
+          token: string
+          expires_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          admin_user_id: string
+          target_user_id: string
+          token: string
+          expires_at: string
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['admin_impersonation_tokens']['Insert']>
+        Relationships: []
+      }
+      admin_export_jobs: {
+        Row: {
+          id: string
+          admin_user_id: string
+          status: string
+          format: string
+          filters: Record<string, unknown>
+          result_url: string | null
+          error_message: string | null
+          created_at: string
+          completed_at: string | null
+        }
+        Insert: {
+          id?: string
+          admin_user_id: string
+          status?: string
+          format?: string
+          filters?: Record<string, unknown>
+          result_url?: string | null
+          error_message?: string | null
+          created_at?: string
+          completed_at?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['admin_export_jobs']['Insert']>
+        Relationships: []
+      }
       subscriptions: {
         Row: {
           id: string

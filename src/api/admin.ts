@@ -3,8 +3,14 @@
  */
 import { invokeAdminApi, invokePulseCompaniesApi } from '@/lib/supabase-functions'
 import type {
+  AdminCompanyPicklistItem,
+  AdminUserDetailCompany,
+  AdminExportJobStartResponse,
+  AdminExportJobStatusResponse,
+  AdminImpersonateResponse,
   AdminSystemHealth,
   AdminUsageMetrics,
+  AdminUserDetailResponse,
   AdminUserExportBody,
   AdminUserExportResponse,
   AdminUserPatchBody,
@@ -112,6 +118,12 @@ function parseAdminUserRow(row: unknown): AdminUserRow | null {
   const status = row.status === 'suspended' ? 'suspended' : 'active'
   const createdAt = typeof row.createdAt === 'string' ? row.createdAt : ''
   const lastLogin = typeof row.lastLogin === 'string' ? row.lastLogin : ''
+  const lastActiveAt = typeof row.lastActiveAt === 'string' ? row.lastActiveAt : lastLogin
+  const rolesRaw = row.roles
+  const rolesParsed = Array.isArray(rolesRaw) ? rolesRaw.filter((x): x is string => typeof x === 'string') : []
+  const roles = rolesParsed.length > 0 ? rolesParsed : [role]
+  const lcRaw = row.linkedCompanies
+  const linkedCompanies = Array.isArray(lcRaw) ? lcRaw.filter((x): x is string => typeof x === 'string') : []
   const pr = row.profile
   let avatarUrl: string | null = null
   if (pr && typeof pr === 'object' && !Array.isArray(pr) && typeof (pr as { avatarUrl?: unknown }).avatarUrl === 'string') {
@@ -122,9 +134,12 @@ function parseAdminUserRow(row: unknown): AdminUserRow | null {
     email,
     name,
     role,
+    roles,
     status,
     createdAt,
     lastLogin,
+    lastActiveAt,
+    linkedCompanies,
     profile: { avatarUrl },
   }
 }
@@ -136,9 +151,12 @@ export function normalizeAdminUserRow(raw: unknown): AdminUserRow {
       email: '',
       name: '',
       role: 'founder',
+      roles: ['founder'],
       status: 'active',
       createdAt: '',
       lastLogin: '',
+      lastActiveAt: '',
+      linkedCompanies: [],
       profile: { avatarUrl: null },
     }
   )
@@ -164,6 +182,9 @@ export async function fetchAdminUsers(params: {
   role?: string
   status?: string
   search?: string
+  createdFrom?: string
+  createdTo?: string
+  companyId?: string
 }): Promise<AdminUsersListResponse> {
   const res = await invokeAdminApi({
     action: 'users_list',
@@ -172,8 +193,158 @@ export async function fetchAdminUsers(params: {
     role: params.role ?? 'all',
     status: params.status ?? 'all',
     search: params.search ?? '',
+    createdFrom: params.createdFrom ?? '',
+    createdTo: params.createdTo ?? '',
+    companyId: params.companyId ?? '',
   })
   return normalizeAdminUsersResponse(unwrapData(res))
+}
+
+export function normalizeAdminUserDetail(raw: unknown): AdminUserDetailResponse | null {
+  const r = isRecord(raw) ? raw : {}
+  const uRaw = r.user
+  if (!isRecord(uRaw)) return null
+  const id = typeof uRaw.id === 'string' ? uRaw.id : ''
+  if (!id) return null
+  const email = typeof uRaw.email === 'string' ? uRaw.email : ''
+  const name = typeof uRaw.name === 'string' ? uRaw.name : ''
+  const role = typeof uRaw.role === 'string' ? uRaw.role : 'founder'
+  const rolesRaw = uRaw.roles
+  const roles = Array.isArray(rolesRaw) ? rolesRaw.filter((x): x is string => typeof x === 'string') : [role]
+  const status = uRaw.status === 'suspended' ? 'suspended' : 'active'
+  const createdAt = typeof uRaw.createdAt === 'string' ? uRaw.createdAt : ''
+  const lastLogin = typeof uRaw.lastLogin === 'string' ? uRaw.lastLogin : ''
+  const lcRaw = uRaw.linkedCompanies
+  const linkedCompanies: AdminUserDetailCompany[] = Array.isArray(lcRaw)
+    ? lcRaw.flatMap((c) => {
+        const o = isRecord(c) ? c : {}
+        const cid = typeof o.id === 'string' ? o.id : ''
+        if (!cid) return []
+        const cname = typeof o.name === 'string' ? o.name : ''
+        const via: 'owner' | 'member' = o.via === 'member' ? 'member' : 'owner'
+        const memRole = typeof o.role === 'string' ? o.role : undefined
+        const base: AdminUserDetailCompany = { id: cid, name: cname || cid, via }
+        return [memRole !== undefined ? { ...base, role: memRole } : base]
+      })
+    : []
+  const actRaw = r.activity
+  const activity = Array.isArray(actRaw)
+    ? actRaw
+        .map((a) => {
+          const o = isRecord(a) ? a : {}
+          const aid = typeof o.id === 'string' ? o.id : String(o.id ?? '')
+          const action = typeof o.action === 'string' ? o.action : ''
+          const createdAt = typeof o.createdAt === 'string' ? o.createdAt : ''
+          const meta = o.metadata
+          const metadata =
+            meta !== null && typeof meta === 'object' && !Array.isArray(meta)
+              ? (meta as Record<string, unknown>)
+              : {}
+          return { id: aid, action, metadata, createdAt }
+        })
+        .filter((x) => x.id.length > 0)
+    : []
+  return {
+    user: {
+      id,
+      email,
+      name,
+      role,
+      roles,
+      status,
+      createdAt,
+      lastLogin,
+      linkedCompanies,
+    },
+    activity,
+  }
+}
+
+export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDetailResponse | null> {
+  const res = await invokeAdminApi({ action: 'users_get', userId })
+  return normalizeAdminUserDetail(unwrapData(res))
+}
+
+export async function impersonateAdminUser(input: {
+  userId: string
+  auditReason?: string
+}): Promise<AdminImpersonateResponse> {
+  const res = await invokeAdminApi({
+    action: 'users_impersonate',
+    userId: input.userId,
+    auditReason: input.auditReason ?? '',
+  })
+  const inner = unwrapData(res)
+  if (!isRecord(inner)) {
+    return {
+      impersonationToken: '',
+      magicLink: '',
+      expiresAt: '',
+      targetUserId: input.userId,
+      message: '',
+    }
+  }
+  return {
+    impersonationToken: typeof inner.impersonationToken === 'string' ? inner.impersonationToken : '',
+    magicLink: typeof inner.magicLink === 'string' ? inner.magicLink : '',
+    expiresAt: typeof inner.expiresAt === 'string' ? inner.expiresAt : '',
+    targetUserId: typeof inner.targetUserId === 'string' ? inner.targetUserId : input.userId,
+    message: typeof inner.message === 'string' ? inner.message : '',
+  }
+}
+
+export async function fetchAdminCompaniesPicklist(): Promise<AdminCompanyPicklistItem[]> {
+  const res = await invokeAdminApi({ action: 'companies_picklist' })
+  const inner = unwrapData(res)
+  const list = inner && isRecord(inner) ? inner.companies : []
+  if (!Array.isArray(list)) return []
+  return list
+    .map((c) => {
+      const o = isRecord(c) ? c : {}
+      return {
+        id: typeof o.id === 'string' ? o.id : '',
+        name: typeof o.name === 'string' ? o.name : '',
+      }
+    })
+    .filter((x) => x.id.length > 0)
+}
+
+export async function startAdminUsersExportJob(body: AdminUserExportBody): Promise<AdminExportJobStartResponse> {
+  const f = body.filters ?? {}
+  const res = await invokeAdminApi({
+    action: 'users_export_job',
+    format: body.format,
+    scope: body.scope ?? 'filtered',
+    filters: {
+      role: f.role,
+      status: f.status,
+      createdFrom: f.createdFrom ?? f.createdAtRange?.from,
+      createdTo: f.createdTo ?? f.createdAtRange?.to,
+      companyId: f.companyId,
+    },
+  })
+  const inner = unwrapData(res)
+  const jobId = isRecord(inner) && typeof inner.jobId === 'string' ? inner.jobId : ''
+  return { jobId }
+}
+
+export async function fetchAdminUsersExportJobStatus(jobId: string): Promise<AdminExportJobStatusResponse> {
+  const res = await invokeAdminApi({ action: 'users_export_job_status', jobId })
+  const inner = unwrapData(res)
+  if (!isRecord(inner)) {
+    return { status: 'pending' }
+  }
+  const st = typeof inner.status === 'string' ? inner.status : 'pending'
+  if (st === 'completed') {
+    const downloadUrl = typeof inner.downloadUrl === 'string' ? inner.downloadUrl : ''
+    return { status: 'completed', downloadUrl }
+  }
+  if (st === 'failed') {
+    const errorMessage = typeof inner.errorMessage === 'string' ? inner.errorMessage : 'Export failed'
+    return { status: 'failed', errorMessage }
+  }
+  if (st === 'processing') return { status: 'processing' }
+  return { status: 'pending' }
 }
 
 export async function patchAdminUser(body: AdminUserPatchBody): Promise<AdminUserRow> {
@@ -187,10 +358,18 @@ export async function patchAdminUser(body: AdminUserPatchBody): Promise<AdminUse
 }
 
 export async function exportAdminUsers(body: AdminUserExportBody): Promise<AdminUserExportResponse> {
+  const f = body.filters ?? {}
   const res = await invokeAdminApi({
     action: 'users_export',
     format: body.format,
-    filters: body.filters ?? {},
+    filters: {
+      role: f.role,
+      status: f.status,
+      createdFrom: f.createdFrom ?? f.createdAtRange?.from,
+      createdTo: f.createdTo ?? f.createdAtRange?.to,
+      companyId: f.companyId,
+      scope: body.scope === 'full' ? 'full' : 'filtered',
+    },
   })
   const inner = unwrapData(res)
   const url = isRecord(inner) && typeof inner.url === 'string' ? inner.url : ''

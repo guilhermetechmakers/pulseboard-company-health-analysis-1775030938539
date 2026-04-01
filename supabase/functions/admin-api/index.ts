@@ -11,8 +11,13 @@ type AdminAction =
   | 'metrics_usage'
   | 'system_health'
   | 'users_list'
+  | 'users_get'
   | 'users_patch'
   | 'users_export'
+  | 'users_export_job'
+  | 'users_export_job_status'
+  | 'users_impersonate'
+  | 'companies_picklist'
   | 'activity_list'
   | 'usage_series'
   | 'audit_logs_list'
@@ -110,6 +115,141 @@ function num(v: unknown, fallback = 0): number {
 
 function str(v: unknown): string | undefined {
   return typeof v === 'string' ? v : undefined
+}
+
+async function findUserIdsByEmailSubstring(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  search: string,
+): Promise<string[] | null> {
+  const needle = search.trim().toLowerCase()
+  if (!needle.includes('@')) return null
+  const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 })
+  if (error || !data?.users) return []
+  const ids: string[] = []
+  for (const u of data.users) {
+    const em = typeof u.email === 'string' ? u.email.toLowerCase() : ''
+    if (em.includes(needle)) ids.push(u.id)
+  }
+  return ids
+}
+
+async function userIdsLinkedToCompany(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  companyId: string,
+): Promise<string[]> {
+  const ids = new Set<string>()
+  const { data: co } = await supabaseAdmin.from('companies').select('user_id').eq('id', companyId).maybeSingle()
+  if (co && isRecord(co) && typeof co.user_id === 'string') ids.add(co.user_id)
+  const { data: mems } = await supabaseAdmin.from('user_company_memberships').select('user_id').eq('company_id', companyId)
+  for (const m of Array.isArray(mems) ? mems : []) {
+    if (isRecord(m) && typeof m.user_id === 'string') ids.add(m.user_id)
+  }
+  return [...ids]
+}
+
+/** Builds a browser-downloadable data URL for admin user exports (CSV or JSON). */
+async function buildAdminUsersDataExportUrl(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  format: 'csv' | 'json',
+  filters: Record<string, unknown>,
+): Promise<{ ok: true; url: string } | { ok: false; message: string }> {
+  const roleFilter = str(filters.role)
+  const statusFilter = str(filters.status)
+  const scope = str(filters.scope)
+  const createdFrom = str(filters.createdFrom) ?? str(filters.from)
+  const createdTo = str(filters.createdTo) ?? str(filters.to)
+  const companyId = str(filters.companyId)
+
+  let idFilter: string[] | null = null
+  if (companyId && isUuid(companyId)) {
+    const linked = await userIdsLinkedToCompany(supabaseAdmin, companyId)
+    idFilter = linked
+    if (linked.length === 0) {
+      const empty: Record<string, unknown>[] = []
+      if (format === 'json') {
+        const jsonStr = JSON.stringify(empty, null, 2)
+        const b64 = btoa(unescape(encodeURIComponent(jsonStr)))
+        return { ok: true, url: `data:application/json;base64,${b64}` }
+      }
+      const header = ['id', 'email', 'name', 'role', 'status', 'createdAt', 'lastLogin']
+      return { ok: true, url: `data:text/csv;charset=utf-8,${encodeURIComponent(header.join(','))}` }
+    }
+  }
+
+  let q = supabaseAdmin
+    .from('profiles')
+    .select('id, display_name, role, account_status, created_at, updated_at, email, last_login_at')
+  if (idFilter) q = q.in('id', idFilter)
+  if (scope !== 'full') {
+    if (roleFilter && roleFilter !== 'all') q = q.eq('role', roleFilter)
+    if (statusFilter && statusFilter !== 'all') q = q.eq('account_status', statusFilter)
+  }
+  if (createdFrom && createdFrom.trim()) {
+    const d = createdFrom.trim()
+    q = q.gte('created_at', d.includes('T') ? d : `${d}T00:00:00.000Z`)
+  }
+  if (createdTo && createdTo.trim()) {
+    const d = createdTo.trim()
+    q = q.lte('created_at', d.includes('T') ? d : `${d}T23:59:59.999Z`)
+  }
+
+  const { data, error } = await q.order('created_at', { ascending: false }).limit(5000)
+  if (error) return { ok: false, message: error.message }
+  const list = Array.isArray(data) ? data : []
+
+  const enriched: {
+    id: string
+    email: string
+    name: string
+    role: string
+    status: string
+    createdAt: string
+    lastLogin: string
+  }[] = []
+  for (const p of list) {
+    const pid = typeof p.id === 'string' ? p.id : String(p.id)
+    let email = typeof p.email === 'string' ? p.email.trim() : ''
+    let lastLogin = typeof p.last_login_at === 'string' ? p.last_login_at : ''
+    if (!email || !lastLogin) {
+      const { data: uData } = await supabaseAdmin.auth.admin.getUserById(pid)
+      const u = uData?.user
+      if (!email && u && typeof u.email === 'string') email = u.email
+      if (!lastLogin && u?.last_sign_in_at) lastLogin = String(u.last_sign_in_at)
+    }
+    enriched.push({
+      id: pid,
+      email,
+      name: typeof p.display_name === 'string' ? p.display_name : '',
+      role: typeof p.role === 'string' ? p.role : '',
+      status: p.account_status === 'suspended' ? 'suspended' : 'active',
+      createdAt: typeof p.created_at === 'string' ? p.created_at : '',
+      lastLogin,
+    })
+  }
+
+  if (format === 'json') {
+    const jsonStr = JSON.stringify(enriched, null, 2)
+    const b64 = btoa(unescape(encodeURIComponent(jsonStr)))
+    return { ok: true, url: `data:application/json;base64,${b64}` }
+  }
+
+  const header = ['id', 'email', 'name', 'role', 'status', 'createdAt', 'lastLogin']
+  const lines = [
+    header.join(','),
+    ...enriched.map((row) =>
+      [
+        row.id,
+        `"${String(row.email ?? '').replace(/"/g, '""')}"`,
+        `"${String(row.name ?? '').replace(/"/g, '""')}"`,
+        row.role,
+        row.status,
+        row.createdAt,
+        row.lastLogin ?? '',
+      ].join(','),
+    ),
+  ]
+  const csv = lines.join('\n')
+  return { ok: true, url: `data:text/csv;charset=utf-8,${encodeURIComponent(csv)}` }
 }
 
 function sanitizeTargetJson(v: unknown): Record<string, unknown> {
@@ -433,48 +573,165 @@ serve(async (req) => {
       const roleFilter = str(body.role)
       const statusFilter = str(body.status)
       const searchRaw = str(body.search)
+      const createdFrom = str(body.createdFrom) ?? str(body.from)
+      const createdTo = str(body.createdTo) ?? str(body.to)
+      const companyId = str(body.companyId)
       const from = (page - 1) * pageSize
       const to = from + pageSize - 1
 
+      let idFilter: string[] | null = null
+      if (companyId && isUuid(companyId)) {
+        const linked = await userIdsLinkedToCompany(supabaseAdmin, companyId)
+        idFilter = linked
+        if (linked.length === 0) {
+          return json({
+            data: {
+              data: [],
+              total: 0,
+            },
+          })
+        }
+      }
+
+      let searchUsesEmailIds = false
+      if (searchRaw && searchRaw.trim()) {
+        const emailIds = await findUserIdsByEmailSubstring(supabaseAdmin, searchRaw.trim())
+        if (emailIds !== null) {
+          searchUsesEmailIds = true
+          if (emailIds.length === 0) {
+            return json({
+              data: {
+                data: [],
+                total: 0,
+              },
+            })
+          }
+          idFilter = idFilter ? emailIds.filter((x) => idFilter?.includes(x)) : emailIds
+          if (idFilter.length === 0) {
+            return json({
+              data: {
+                data: [],
+                total: 0,
+              },
+            })
+          }
+        }
+      }
+
       let q = supabaseAdmin
         .from('profiles')
-        .select('id, display_name, role, account_status, created_at, updated_at', { count: 'exact' })
+        .select('id, display_name, role, account_status, created_at, updated_at, email, last_login_at', { count: 'exact' })
 
+      if (idFilter) {
+        q = q.in('id', idFilter)
+      }
       if (roleFilter && roleFilter !== 'all') {
         q = q.eq('role', roleFilter)
       }
       if (statusFilter && statusFilter !== 'all') {
         q = q.eq('account_status', statusFilter)
       }
-      if (searchRaw && searchRaw.trim()) {
+      if (createdFrom && createdFrom.trim()) {
+        const d = createdFrom.trim()
+        q = q.gte('created_at', d.includes('T') ? d : `${d}T00:00:00.000Z`)
+      }
+      if (createdTo && createdTo.trim()) {
+        const d = createdTo.trim()
+        q = q.lte('created_at', d.includes('T') ? d : `${d}T23:59:59.999Z`)
+      }
+      if (searchRaw && searchRaw.trim() && !searchUsesEmailIds) {
         const safe = escapeIlike(searchRaw.trim())
-        q = q.ilike('display_name', `%${safe}%`)
+        q = q.or(`display_name.ilike.%${safe}%,email.ilike.%${safe}%`)
       }
 
       const { data, error, count } = await q.order('created_at', { ascending: false }).range(from, to)
       if (error) throw new Error(error.message)
 
       const rawList = Array.isArray(data) ? data : []
-      const users = []
+      const pids = rawList
+        .map((row) => (isRecord(row) && typeof row.id === 'string' ? row.id : String((row as { id?: unknown }).id ?? '')))
+        .filter((x) => x.length > 0)
+
+      const linkedByUser = new Map<string, Set<string>>()
+      const addCompanyNames = (uid: string, names: string[]) => {
+        if (!linkedByUser.has(uid)) linkedByUser.set(uid, new Set())
+        const s = linkedByUser.get(uid)!
+        for (const n of names) {
+          const t = n.trim()
+          if (t) s.add(t)
+        }
+      }
+
+      if (pids.length > 0) {
+        const { data: ownedCos } = await supabaseAdmin.from('companies').select('user_id, name').in('user_id', pids)
+        for (const c of Array.isArray(ownedCos) ? ownedCos : []) {
+          if (!isRecord(c)) continue
+          const uid = typeof c.user_id === 'string' ? c.user_id : ''
+          const nm = typeof c.name === 'string' ? c.name : ''
+          if (uid) addCompanyNames(uid, [nm])
+        }
+        const { data: memRows } = await supabaseAdmin
+          .from('user_company_memberships')
+          .select('user_id, company_id')
+          .in('user_id', pids)
+        const memCompanyIds = [
+          ...new Set(
+            (Array.isArray(memRows) ? memRows : [])
+              .map((m) => (isRecord(m) && typeof m.company_id === 'string' ? m.company_id : ''))
+              .filter(Boolean),
+          ),
+        ]
+        if (memCompanyIds.length > 0) {
+          const { data: cn } = await supabaseAdmin.from('companies').select('id, name').in('id', memCompanyIds)
+          const idToName = new Map<string, string>()
+          for (const row of Array.isArray(cn) ? cn : []) {
+            if (isRecord(row) && typeof row.id === 'string') {
+              idToName.set(row.id, typeof row.name === 'string' ? row.name : row.id)
+            }
+          }
+          for (const m of Array.isArray(memRows) ? memRows : []) {
+            if (!isRecord(m)) continue
+            const uid = typeof m.user_id === 'string' ? m.user_id : ''
+            const cid = typeof m.company_id === 'string' ? m.company_id : ''
+            if (uid && cid) addCompanyNames(uid, [idToName.get(cid) ?? cid])
+          }
+        }
+      }
+
+      const users: Record<string, unknown>[] = []
       for (const p of rawList) {
         const pid = typeof p.id === 'string' ? p.id : String(p.id)
-        const { data: uData } = await supabaseAdmin.auth.admin.getUserById(pid)
-        const u = uData?.user
-        const email = u && typeof u.email === 'string' ? u.email : ''
+        let email = typeof p.email === 'string' ? p.email.trim() : ''
+        let lastLogin = typeof p.last_login_at === 'string' ? p.last_login_at : ''
+        let u = undefined as
+          | { email?: string; last_sign_in_at?: string; user_metadata?: unknown }
+          | undefined
+        if (!email || !lastLogin) {
+          const { data: uData } = await supabaseAdmin.auth.admin.getUserById(pid)
+          u = uData?.user
+          if (!email && u && typeof u.email === 'string') email = u.email
+          if (!lastLogin && u?.last_sign_in_at) lastLogin = String(u.last_sign_in_at)
+        }
         const meta = u?.user_metadata && typeof u.user_metadata === 'object' && !Array.isArray(u.user_metadata)
           ? (u.user_metadata as Record<string, unknown>)
           : {}
         const fullName = typeof meta.full_name === 'string' ? meta.full_name : ''
         const displayName = typeof p.display_name === 'string' ? p.display_name.trim() : ''
         const name = displayName !== '' ? displayName : fullName !== '' ? fullName : email || '—'
+        const nmSet = linkedByUser.get(pid)
+        const linkedCompanies = nmSet ? [...nmSet].slice(0, 12) : []
+        const roleStr = typeof p.role === 'string' ? p.role : 'founder'
         users.push({
           id: pid,
           email,
           name,
-          role: typeof p.role === 'string' ? p.role : 'founder',
+          role: roleStr,
+          roles: [roleStr],
           status: p.account_status === 'suspended' ? 'suspended' : 'active',
           createdAt: typeof p.created_at === 'string' ? p.created_at : '',
-          lastLogin: u?.last_sign_in_at ? String(u.last_sign_in_at) : '',
+          lastLogin,
+          lastActiveAt: lastLogin,
+          linkedCompanies,
           profile: { avatarUrl: null as string | null },
         })
       }
@@ -483,6 +740,196 @@ serve(async (req) => {
         data: {
           data: users,
           total: num(count, users.length),
+        },
+      })
+    }
+
+    if (action === 'users_get') {
+      const userId = str(body.userId)
+      if (!userId || !isUuid(userId)) return json({ error: 'userId required' }, 400)
+      const { data: p, error: pErr } = await supabaseAdmin
+        .from('profiles')
+        .select('id, display_name, role, account_status, created_at, updated_at')
+        .eq('id', userId)
+        .maybeSingle()
+      if (pErr) throw new Error(pErr.message)
+      if (!p || !isRecord(p)) return json({ error: 'User not found' }, 404)
+
+      const { data: uData } = await supabaseAdmin.auth.admin.getUserById(userId)
+      const u = uData?.user
+      const email = u && typeof u.email === 'string' ? u.email : ''
+      const meta = u?.user_metadata && typeof u.user_metadata === 'object' && !Array.isArray(u.user_metadata)
+        ? (u.user_metadata as Record<string, unknown>)
+        : {}
+      const fullName = typeof meta.full_name === 'string' ? meta.full_name : ''
+      const displayName = typeof p.display_name === 'string' ? p.display_name.trim() : ''
+      const name = displayName !== '' ? displayName : fullName !== '' ? fullName : email || '—'
+
+      const { data: ownedCos } = await supabaseAdmin.from('companies').select('id, name').eq('user_id', userId).order('name')
+      const { data: memRows } = await supabaseAdmin
+        .from('user_company_memberships')
+        .select('company_id, role')
+        .eq('user_id', userId)
+      const linkedCompanies: { id: string; name: string; via: 'owner' | 'member'; role?: string }[] = []
+      for (const c of Array.isArray(ownedCos) ? ownedCos : []) {
+        if (isRecord(c) && typeof c.id === 'string' && typeof c.name === 'string') {
+          linkedCompanies.push({ id: c.id, name: c.name, via: 'owner' })
+        }
+      }
+      for (const m of Array.isArray(memRows) ? memRows : []) {
+        if (!isRecord(m) || typeof m.company_id !== 'string') continue
+        const cid = m.company_id
+        const already = linkedCompanies.some((x) => x.id === cid && x.via === 'owner')
+        if (already) continue
+        const { data: co } = await supabaseAdmin.from('companies').select('name').eq('id', cid).maybeSingle()
+        const nm = co && isRecord(co) && typeof co.name === 'string' ? co.name : cid
+        linkedCompanies.push({
+          id: cid,
+          name: nm,
+          via: 'member',
+          role: typeof m.role === 'string' ? m.role : undefined,
+        })
+      }
+
+      const { data: actRows } = await supabaseAdmin
+        .from('user_activity_logs')
+        .select('id, action, metadata, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(30)
+      const activity = (Array.isArray(actRows) ? actRows : []).map((r) => {
+        const row = isRecord(r) ? r : {}
+        return {
+          id: typeof row.id === 'string' ? row.id : String(row.id ?? ''),
+          action: typeof row.action === 'string' ? row.action : '',
+          metadata: isRecord(row.metadata) ? row.metadata : {},
+          createdAt: typeof row.created_at === 'string' ? row.created_at : '',
+        }
+      })
+
+      const roleStr = typeof p.role === 'string' ? p.role : 'founder'
+      await supabaseAdmin.from('admin_actions').insert({
+        admin_id: adminId,
+        action: 'users_get',
+        target_user_id: userId,
+        metadata: { source: 'admin_user_detail' },
+      })
+
+      return json({
+        data: {
+          user: {
+            id: userId,
+            email,
+            name,
+            role: roleStr,
+            roles: [roleStr],
+            status: p.account_status === 'suspended' ? 'suspended' : 'active',
+            createdAt: typeof p.created_at === 'string' ? p.created_at : '',
+            lastLogin: u?.last_sign_in_at ? String(u.last_sign_in_at) : '',
+            linkedCompanies,
+          },
+          activity,
+        },
+      })
+    }
+
+    if (action === 'users_impersonate') {
+      const targetUserId = str(body.userId)
+      const auditReason = str(body.auditReason) ?? str(body.reason) ?? ''
+      if (!targetUserId || !isUuid(targetUserId)) return json({ error: 'userId required' }, 400)
+      if (targetUserId === adminId) return json({ error: 'Cannot impersonate yourself' }, 400)
+
+      const { data: tprof } = await supabaseAdmin.from('profiles').select('role, account_status').eq('id', targetUserId).maybeSingle()
+      if (!tprof || !isRecord(tprof)) return json({ error: 'User not found' }, 404)
+      if (tprof.role === 'admin') {
+        return json({ error: 'Cannot impersonate administrator accounts' }, 403)
+      }
+
+      const token = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '')
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+
+      const { error: insErr } = await supabaseAdmin.from('admin_impersonation_tokens').insert({
+        admin_user_id: adminId,
+        target_user_id: targetUserId,
+        token,
+        expires_at: expiresAt,
+      })
+      if (insErr) throw new Error(insErr.message)
+
+      await supabaseAdmin.from('audit_logs').insert({
+        actor_user_id: adminId,
+        action: 'admin_impersonation_started',
+        entity: 'user',
+        entity_id: targetUserId,
+        metadata: {
+          auditReason: auditReason.slice(0, 2000),
+          tokenSuffix: token.slice(-8),
+        },
+        notes: 'Admin impersonation token issued (support / audit)',
+      })
+      await supabaseAdmin.from('admin_actions').insert({
+        admin_id: adminId,
+        action: 'user_impersonate',
+        target_user_id: targetUserId,
+        metadata: { auditReason: auditReason.slice(0, 500) },
+      })
+      try {
+        await supabaseAdmin.from('telemetry_events').insert({
+          user_id: adminId,
+          event_type: 'admin_user_impersonation',
+          payload: { targetUserId, hasReason: auditReason.length > 0 },
+        })
+      } catch {
+        /* optional telemetry */
+      }
+
+      const { data: targetAuth } = await supabaseAdmin.auth.admin.getUserById(targetUserId)
+      const targetEmail = targetAuth?.user?.email
+      if (!targetEmail || typeof targetEmail !== 'string') {
+        return json({ error: 'Target user has no email; cannot issue sign-in link' }, 422)
+      }
+
+      const linkRes = await supabaseAdmin.auth.admin.generateLink({
+        type: 'magiclink',
+        email: targetEmail,
+      })
+      if (linkRes.error) {
+        throw new Error(linkRes.error.message)
+      }
+      const props = linkRes.data?.properties as Record<string, unknown> | undefined
+      const magicLink = typeof props?.action_link === 'string' ? props.action_link : ''
+
+      return json({
+        data: {
+          impersonationToken: token,
+          magicLink,
+          expiresAt,
+          targetUserId,
+          message:
+            'Audit token stored. Open the magic link in a private window to complete sign-in as this user. Treat both values as secrets.',
+        },
+      })
+    }
+
+    if (action === 'companies_picklist') {
+      const { data: rows, error } = await supabaseAdmin
+        .from('companies')
+        .select('id, name')
+        .order('name', { ascending: true })
+        .limit(500)
+      if (error) throw new Error(error.message)
+      const list = Array.isArray(rows) ? rows : []
+      return json({
+        data: {
+          companies: list
+            .map((r) => {
+              const rec = isRecord(r) ? r : {}
+              return {
+                id: typeof rec.id === 'string' ? rec.id : '',
+                name: typeof rec.name === 'string' ? rec.name : '—',
+              }
+            })
+            .filter((x) => x.id.length > 0),
         },
       })
     }
@@ -518,6 +965,17 @@ serve(async (req) => {
         target_user_id: userId,
         metadata: { role: nextRole ?? null, status: nextStatus ?? null },
       })
+      if (nextStatus) {
+        try {
+          await supabaseAdmin.from('telemetry_events').insert({
+            user_id: adminId,
+            event_type: nextStatus === 'suspended' ? 'admin_user_suspended' : 'admin_user_reactivated',
+            payload: { targetUserId: userId },
+          })
+        } catch {
+          /* optional */
+        }
+      }
 
       const row = updated as Record<string, unknown>
       const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId)
@@ -526,15 +984,19 @@ serve(async (req) => {
       const displayName = typeof row.display_name === 'string' ? row.display_name.trim() : ''
       const name = displayName !== '' ? displayName : email || '—'
 
+      const roleOut = typeof row.role === 'string' ? row.role : 'founder'
       return json({
         data: {
           id: typeof row.id === 'string' ? row.id : String(row.id),
           email,
           name,
-          role: typeof row.role === 'string' ? row.role : 'founder',
+          role: roleOut,
+          roles: [roleOut],
           status: row.account_status === 'suspended' ? 'suspended' : 'active',
           createdAt: typeof row.created_at === 'string' ? row.created_at : '',
           lastLogin: u?.last_sign_in_at ? String(u.last_sign_in_at) : '',
+          lastActiveAt: u?.last_sign_in_at ? String(u.last_sign_in_at) : '',
+          linkedCompanies: [] as string[],
           profile: { avatarUrl: null as string | null },
         },
       })
@@ -543,60 +1005,105 @@ serve(async (req) => {
     if (action === 'users_export') {
       const format = str(body.format) === 'json' ? 'json' : 'csv'
       const filters = isRecord(body.filters) ? body.filters : {}
-      const roleFilter = str(filters.role)
-      const statusFilter = str(filters.status)
+      const built = await buildAdminUsersDataExportUrl(supabaseAdmin, format, filters)
+      if (!built.ok) throw new Error(built.message)
+      return json({ data: { url: built.url } })
+    }
 
-      let q = supabaseAdmin.from('profiles').select('id, display_name, role, account_status, created_at, updated_at')
-      if (roleFilter && roleFilter !== 'all') q = q.eq('role', roleFilter)
-      if (statusFilter && statusFilter !== 'all') q = q.eq('account_status', statusFilter)
-
-      const { data, error } = await q.order('created_at', { ascending: false }).limit(5000)
-      if (error) throw new Error(error.message)
-      const list = Array.isArray(data) ? data : []
-
-      const enriched = []
-      for (const p of list) {
-        const pid = typeof p.id === 'string' ? p.id : String(p.id)
-        const { data: uData } = await supabaseAdmin.auth.admin.getUserById(pid)
-        const u = uData?.user
-        const email = u && typeof u.email === 'string' ? u.email : ''
-        enriched.push({
-          id: pid,
-          email,
-          name: typeof p.display_name === 'string' ? p.display_name : '',
-          role: typeof p.role === 'string' ? p.role : '',
-          status: p.account_status === 'suspended' ? 'suspended' : 'active',
-          createdAt: typeof p.created_at === 'string' ? p.created_at : '',
-          lastLogin: u?.last_sign_in_at ? String(u.last_sign_in_at) : '',
+    if (action === 'users_export_job') {
+      const format = str(body.format) === 'json' ? 'json' : 'csv'
+      const filters = isRecord(body.filters) ? body.filters : {}
+      const scope = str(body.scope) === 'full' ? 'full' : 'filtered'
+      const mergedFilters = { ...filters, scope }
+      const { data: jobRow, error: jInsErr } = await supabaseAdmin
+        .from('admin_export_jobs')
+        .insert({
+          admin_user_id: adminId,
+          status: 'pending',
+          format,
+          filters: mergedFilters,
         })
+        .select('id')
+        .maybeSingle()
+      if (jInsErr) throw new Error(jInsErr.message)
+      const jobId = jobRow && isRecord(jobRow) && typeof jobRow.id === 'string' ? jobRow.id : ''
+      if (!jobId) return json({ error: 'Could not create export job' }, 500)
+      return json({ data: { jobId, status: 'pending' as const } })
+    }
+
+    if (action === 'users_export_job_status') {
+      const jobId = str(body.jobId)
+      if (!jobId || !isUuid(jobId)) return json({ error: 'jobId required' }, 400)
+      const { data: job, error: jErr } = await supabaseAdmin.from('admin_export_jobs').select('*').eq('id', jobId).maybeSingle()
+      if (jErr) throw new Error(jErr.message)
+      if (!job || !isRecord(job)) return json({ error: 'Job not found' }, 404)
+      const owner = typeof job.admin_user_id === 'string' ? job.admin_user_id : ''
+      if (owner !== adminId) return json({ error: 'Forbidden' }, 403)
+      const st = typeof job.status === 'string' ? job.status : 'pending'
+      if (st === 'completed') {
+        const url = typeof job.result_url === 'string' ? job.result_url : ''
+        return json({ data: { status: 'completed' as const, downloadUrl: url } })
+      }
+      if (st === 'failed') {
+        const errMsg = typeof job.error_message === 'string' ? job.error_message : 'Export failed'
+        return json({ data: { status: 'failed' as const, errorMessage: errMsg } })
       }
 
-      if (format === 'json') {
-        const payload = enriched
-        const jsonStr = JSON.stringify(payload, null, 2)
-        const b64 = btoa(unescape(encodeURIComponent(jsonStr)))
-        const url = `data:application/json;base64,${b64}`
-        return json({ data: { url } })
+      const { data: claimed, error: claimErr } = await supabaseAdmin
+        .from('admin_export_jobs')
+        .update({ status: 'processing' })
+        .eq('id', jobId)
+        .eq('status', 'pending')
+        .select('id, format, filters')
+        .maybeSingle()
+      if (claimErr) throw new Error(claimErr.message)
+
+      if (!claimed || !isRecord(claimed)) {
+        const { data: again } = await supabaseAdmin.from('admin_export_jobs').select('status, result_url, error_message').eq('id', jobId).maybeSingle()
+        const r = again && isRecord(again) ? again : {}
+        const st2 = typeof r.status === 'string' ? r.status : 'pending'
+        if (st2 === 'completed') {
+          return json({ data: { status: 'completed' as const, downloadUrl: typeof r.result_url === 'string' ? r.result_url : '' } })
+        }
+        if (st2 === 'failed') {
+          return json({ data: { status: 'failed' as const, errorMessage: typeof r.error_message === 'string' ? r.error_message : '' } })
+        }
+        return json({ data: { status: 'processing' as const } })
       }
 
-      const header = ['id', 'email', 'name', 'role', 'status', 'createdAt', 'lastLogin']
-      const lines = [
-        header.join(','),
-        ...enriched.map((p) =>
-          [
-            p.id,
-            `"${String(p.email ?? '').replace(/"/g, '""')}"`,
-            `"${String(p.name ?? '').replace(/"/g, '""')}"`,
-            p.role,
-            p.status,
-            p.createdAt,
-            p.lastLogin ?? '',
-          ].join(','),
-        ),
-      ]
-      const csv = lines.join('\n')
-      const url = `data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`
-      return json({ data: { url } })
+      const fmt = typeof claimed.format === 'string' && claimed.format === 'json' ? 'json' : 'csv'
+      const filt = isRecord(claimed.filters) ? claimed.filters : {}
+      try {
+        const built = await buildAdminUsersDataExportUrl(supabaseAdmin, fmt, filt)
+        if (!built.ok) {
+          await supabaseAdmin
+            .from('admin_export_jobs')
+            .update({
+              status: 'failed',
+              error_message: built.message,
+              completed_at: new Date().toISOString(),
+            })
+            .eq('id', jobId)
+          return json({ data: { status: 'failed' as const, errorMessage: built.message } })
+        }
+        await supabaseAdmin
+          .from('admin_export_jobs')
+          .update({
+            status: 'completed',
+            result_url: built.url,
+            completed_at: new Date().toISOString(),
+            error_message: null,
+          })
+          .eq('id', jobId)
+        return json({ data: { status: 'completed' as const, downloadUrl: built.url } })
+      } catch (e) {
+        const message = e instanceof Error ? e.message : 'Export error'
+        await supabaseAdmin
+          .from('admin_export_jobs')
+          .update({ status: 'failed', error_message: message, completed_at: new Date().toISOString() })
+          .eq('id', jobId)
+        return json({ data: { status: 'failed' as const, errorMessage: message } })
+      }
     }
 
     if (action === 'audit_logs_stats') {
@@ -1113,8 +1620,13 @@ serve(async (req) => {
         'metrics_usage',
         'system_health',
         'users_list',
+        'users_get',
         'users_patch',
         'users_export',
+        'users_export_job',
+        'users_export_job_status',
+        'users_impersonate',
+        'companies_picklist',
         'activity_list',
         'usage_series',
         'audit_logs_list',
