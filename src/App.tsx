@@ -30,6 +30,7 @@ import {
   NotificationsPage,
   DataImportPage,
   DataExportPage,
+  SearchPage,
 } from '@/pages'
 import { AdminOnlyRoute } from '@/components/auth/admin-only-route'
 import { AdminLayout } from '@/components/layout/admin-layout'
@@ -87,6 +88,7 @@ export default function App() {
               <Route path="/settings" element={<Guard><SettingsPage /></Guard>} />
               <Route path="/data/import" element={<Guard><DataImportPage /></Guard>} />
               <Route path="/data/export" element={<Guard><DataExportPage /></Guard>} />
+              <Route path="/search" element={<Guard><SearchPage /></Guard>} />
               <Route path="/notifications" element={<Guard><NotificationsPage /></Guard>} />
               <Route
                 path="/admin"

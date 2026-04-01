@@ -14,6 +14,7 @@ export interface Database {
           goals: string | null
           products: string | null
           health_scores: Record<string, unknown>
+          search_tags: string[]
           created_at: string
           updated_at: string
         }
@@ -29,6 +30,7 @@ export interface Database {
           goals?: string | null
           products?: string | null
           health_scores?: Record<string, unknown>
+          search_tags?: string[]
           created_at?: string
           updated_at?: string
         }
@@ -42,6 +44,7 @@ export interface Database {
           goals?: string | null
           products?: string | null
           health_scores?: Record<string, unknown>
+          search_tags?: string[]
           updated_at?: string
         }
         Relationships: []

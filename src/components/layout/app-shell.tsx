@@ -1,6 +1,7 @@
 import type { PropsWithChildren } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { LayoutDashboard, FileText, LogIn, LogOut, UserRound } from 'lucide-react'
+import { GlobalSearchBar } from '@/components/search/global-search-bar'
 import { useAuth } from '@/contexts/auth-context'
 import { useUserProfile } from '@/hooks/use-auth-profile'
 import { Button } from '@/components/ui/button'
@@ -14,6 +15,7 @@ const links = [
   { to: '/settings', label: 'Integrations' },
   { to: '/data/import', label: 'Data import' },
   { to: '/data/export', label: 'Data export' },
+  { to: '/search', label: 'Search' },
   { to: '/company/create', label: 'Create Company' },
   { to: '/analysis/generate', label: 'Generate Analysis' },
 ]
@@ -31,6 +33,11 @@ export function AppShell({ children }: PropsWithChildren) {
             <LayoutDashboard className="h-4 w-4 text-primary" aria-hidden />
             PulseBoard
           </Link>
+          {session ? (
+            <div className="order-last w-full md:order-none md:mx-4 md:max-w-md md:flex-1">
+              <GlobalSearchBar />
+            </div>
+          ) : null}
           <nav className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
             {(links ?? []).map((link) => (
               <NavLink

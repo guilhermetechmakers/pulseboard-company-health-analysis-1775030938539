@@ -1,0 +1,26 @@
+/** i18n-ready copy for search surfaces (replace with ICU/catalog later). */
+
+export const searchI18n = {
+  searchTitle: 'Search workspace',
+  searchDescription: 'Find companies, reports, and users with autosuggest and faceted filters.',
+  globalPlaceholder: 'Search companies, reports, users…',
+  noMatches: 'No results match your search and filters.',
+  tryAdjust: 'Try clearing filters or using a shorter query.',
+  loading: 'Searching…',
+  autosuggestLoading: 'Loading suggestions…',
+  sectionCompanies: 'Companies',
+  sectionReports: 'Reports',
+  sectionUsers: 'Users',
+  clear: 'Clear',
+  filters: 'Filters',
+  applyFilters: 'Apply',
+  resetUrl: 'Reset link',
+  loadMore: 'Load more',
+  openDetail: 'Details',
+  openPage: 'Open',
+  exportJson: 'Export JSON',
+  runAnalysis: 'Run analysis',
+  adminUsersHint: 'User results are limited to your account unless you are an admin.',
+  keyboardHint: 'Use ↑ ↓ to navigate, Enter to select, Esc to close.',
+  resultCount: (n: number) => (n === 1 ? '1 result' : `${n} results`),
+} as const

@@ -63,6 +63,9 @@ export const api = {
   delete: <T>(endpoint: string) => apiRequest<T>(endpoint, { method: 'DELETE' }),
 }
 
+/** Full-text / faceted search via `pulse-search` Edge Function. */
+export { invokePulseSearch } from '@/lib/pulse-search-api'
+
 /** Prefer `@/lib/supabase-functions` for authenticated Edge Function calls (native fetch + session). */
 export {
   invokeAnalyzeCompanyHealth,

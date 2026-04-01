@@ -20,6 +20,7 @@ export { UserProfilePage } from '@/pages/user-profile-page'
 export { NotificationsPage } from '@/pages/notifications-page'
 export { DataImportPage } from '@/pages/data-import-page'
 export { DataExportPage } from '@/pages/data-export-page'
+export { SearchPage } from '@/pages/search-page'
 
 function sectionCard(title: string, text: string) {
   return (
