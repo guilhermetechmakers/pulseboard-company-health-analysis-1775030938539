@@ -1,0 +1,2109 @@
+âš ï¸ CRITICAL EXECUTION RULES - READ FIRST âš ï¸
+âŒ NEVER run: npm run dev, npm start, yarn dev, pnpm dev, or ANY development server
+âŒ NEVER run: long-running processes, servers, or commands that don't exit
+âŒ NEVER test the application by starting it
+âœ… ALLOWED: npm install, npm run build, npm run test (if needed)
+âœ… YOUR TASK: Create/modify files only, then STOP and EXIT immediately
+âš ï¸ The MCP server handles all testing and validation separately
+
+You are an expert full-stack developer proficient in TypeScript, React, Next.js, and modern UI/UX frameworks (Tailwind CSS, Shadcn UI, Radix UI).
+
+=== DESIGN REFERENCE (MANDATORY) ===
+# Modern Design Best Practices
+
+## Philosophy
+
+Create unique, memorable experiences while maintaining consistency through modern design principles. Every project should feel distinct yet professional, innovative yet intuitive.
+
+---
+
+## Landing Pages & Marketing Sites
+
+### Hero Sections
+**Go beyond static backgrounds:**
+- Animated gradients with subtle movement
+- Particle systems or geometric shapes floating
+- Interactive canvas backgrounds (Three.js, WebGL)
+- Video backgrounds with proper fallbacks
+- Parallax scrolling effects
+- Gradient mesh animations
+- Morphing blob animations
+
+
+### Layout Patterns
+**Use modern grid systems:**
+- Bento grids (asymmetric card layouts)
+- Masonry layouts for varied content
+- Feature sections with diagonal cuts or curves
+- Overlapping elements with proper z-index
+- Split-screen designs with scroll-triggered reveals
+
+**Avoid:** Traditional 3-column equal grids
+
+### Scroll Animations
+**Engage users as they scroll:**
+- Fade-in and slide-up animations for sections
+- Scroll-triggered parallax effects
+- Progress indicators for long pages
+- Sticky elements that transform on scroll
+- Horizontal scroll sections for portfolios
+- Text reveal animations (word by word, letter by letter)
+- Number counters animating into view
+
+**Avoid:** Static pages with no scroll interaction
+
+### Call-to-Action Areas
+**Make CTAs impossible to miss:**
+- Gradient buttons with hover effects
+- Floating action buttons with micro-interactions
+- Animated borders or glowing effects
+- Scale/lift on hover
+- Interactive elements that respond to mouse position
+- Pulsing indicators for primary actions
+
+---
+
+## Dashboard Applications
+
+### Layout Structure
+**Always use collapsible side navigation:**
+- Sidebar that can collapse to icons only
+- Smooth transition animations between states
+- Persistent navigation state (remember user preference)
+- Mobile: drawer that slides in/out
+- Desktop: sidebar with expand/collapse toggle
+- Icons visible even when collapsed
+
+**Structure:**
+```
+/dashboard (layout wrapper with sidebar)
+  /dashboard/overview
+  /dashboard/analytics
+  /dashboard/settings
+  /dashboard/users
+  /dashboard/projects
+```
+
+All dashboard pages should be nested inside the dashboard layout, not separate routes.
+
+### Data Tables
+**Modern table design:**
+- Sticky headers on scroll
+- Row hover states with subtle elevation
+- Sortable columns with clear indicators
+- Pagination with items-per-page control
+- Search/filter with instant feedback
+- Selection checkboxes with bulk actions
+- Responsive: cards on mobile, table on desktop
+- Loading skeletons, not spinners
+- Empty states with illustrations or helpful text
+
+**Use modern table libraries:**
+- TanStack Table (React Table v8)
+- AG Grid for complex data
+- Data Grid from MUI (if using MUI)
+
+### Charts & Visualizations
+**Use the latest charting libraries:**
+- Recharts (for React, simple charts)
+- Chart.js v4 (versatile, well-maintained)
+- Apache ECharts (advanced, interactive)
+- D3.js (custom, complex visualizations)
+- Tremor (for dashboards, built on Recharts)
+
+**Chart best practices:**
+- Animated transitions when data changes
+- Interactive tooltips with detailed info
+- Responsive sizing
+- Color scheme matching design system
+- Legend placement that doesn't obstruct data
+- Loading states while fetching data
+
+### Dashboard Cards
+**Metric cards should stand out:**
+- Gradient backgrounds or colored accents
+- Trend indicators (↑ ↓ with color coding)
+- Sparkline charts for historical data
+- Hover effects revealing more detail
+- Icon representing the metric
+- Comparison to previous period
+
+---
+
+## Color & Visual Design
+
+### Color Palettes
+**Create depth with gradients:**
+- Primary gradient (not just solid primary color)
+- Subtle background gradients
+- Gradient text for headings
+- Gradient borders on cards
+- Elevated surfaces for depth
+
+**Color usage:**
+- 60-30-10 rule (dominant, secondary, accent)
+- Consistent semantic colors (success, warning, error)
+- Accessible contrast ratios (WCAG AA minimum)
+
+### Typography
+**Create hierarchy through contrast:**
+- Large, bold headings (48-72px for heroes)
+- Clear size differences between levels
+- Variable font weights (300, 400, 600, 700)
+- Letter spacing for small caps
+- Line height 1.5-1.7 for body text
+- Inter, Poppins, or DM Sans for modern feel
+
+### Shadows & Depth
+**Layer UI elements:**
+- Multi-layer shadows for realistic depth
+- Colored shadows matching element color
+- Elevated states on hover
+- Neumorphism for special elements (sparingly)
+
+---
+
+## Interactions & Micro-animations
+
+### Button Interactions
+**Every button should react:**
+- Scale slightly on hover (1.02-1.05)
+- Lift with shadow on hover
+- Ripple effect on click
+- Loading state with spinner or progress
+- Disabled state clearly visible
+- Success state with checkmark animation
+
+### Card Interactions
+**Make cards feel alive:**
+- Lift on hover with increased shadow
+- Subtle border glow on hover
+- Tilt effect following mouse (3D transform)
+- Smooth transitions (200-300ms)
+- Click feedback for interactive cards
+
+### Form Interactions
+**Guide users through forms:**
+- Input focus states with border color change
+- Floating labels that animate up
+- Real-time validation with inline messages
+- Success checkmarks for valid inputs
+- Error states with shake animation
+- Password strength indicators
+- Character count for text areas
+
+### Page Transitions
+**Smooth between views:**
+- Fade + slide for page changes
+- Skeleton loaders during data fetch
+- Optimistic UI updates
+- Stagger animations for lists
+- Route transition animations
+
+---
+
+## Mobile Responsiveness
+
+### Mobile-First Approach
+**Design for mobile, enhance for desktop:**
+- Touch targets minimum 44x44px
+- Generous padding and spacing
+- Sticky bottom navigation on mobile
+- Collapsible sections for long content
+- Swipeable cards and galleries
+- Pull-to-refresh where appropriate
+
+### Responsive Patterns
+**Adapt layouts intelligently:**
+- Hamburger menu → full nav bar
+- Card grid → stack on mobile
+- Sidebar → drawer
+- Multi-column → single column
+- Data tables → card list
+- Hide/show elements based on viewport
+
+---
+
+## Loading & Empty States
+
+### Loading States
+**Never leave users wondering:**
+- Skeleton screens matching content layout
+- Progress bars for known durations
+- Animated placeholders
+- Spinners only for short waits (<3s)
+- Stagger loading for multiple elements
+- Shimmer effects on skeletons
+
+### Empty States
+**Make empty states helpful:**
+- Illustrations or icons
+- Helpful copy explaining why it's empty
+- Clear CTA to add first item
+- Examples or suggestions
+- No "no data" text alone
+
+---
+
+## Unique Elements to Stand Out
+
+### Distinctive Features
+**Add personality:**
+- Custom cursor effects on landing pages
+- Animated page numbers or section indicators
+- Unusual hover effects (magnification, distortion)
+- Custom scrollbars
+- Glassmorphism for overlays
+- Animated SVG icons
+- Typewriter effects for hero text
+- Confetti or celebration animations for actions
+
+### Interactive Elements
+**Engage users:**
+- Drag-and-drop interfaces
+- Sliders and range controls
+- Toggle switches with animations
+- Progress steps with animations
+- Expandable/collapsible sections
+- Tabs with slide indicators
+- Image comparison sliders
+- Interactive demos or playgrounds
+
+---
+
+## Consistency Rules
+
+### Maintain Consistency
+**What should stay consistent:**
+- Spacing scale (4px, 8px, 16px, 24px, 32px, 48px, 64px)
+- Border radius values
+- Animation timing (200ms, 300ms, 500ms)
+- Color system (primary, secondary, accent, neutrals)
+- Typography scale
+- Icon style (outline vs filled)
+- Button styles across the app
+- Form element styles
+
+### What Can Vary
+**Project-specific customization:**
+- Color palette (different colors, same system)
+- Layout creativity (grids, asymmetry)
+- Illustration style
+- Animation personality
+- Feature-specific interactions
+- Hero section design
+- Card styling variations
+- Background patterns or textures
+
+---
+
+## Technical Excellence
+
+### Performance
+- Optimize images (WebP, lazy loading)
+- Code splitting for faster loads
+- Debounce search inputs
+- Virtualize long lists
+- Minimize re-renders
+- Use proper memoization
+
+### Accessibility
+- Keyboard navigation throughout
+- ARIA labels where needed
+- Focus indicators visible
+- Screen reader friendly
+- Sufficient color contrast
+- Respect reduced motion preferences
+
+---
+
+## Key Principles
+
+1. **Be Bold** - Don't be afraid to try unique layouts and interactions
+2. **Be Consistent** - Use the same patterns for similar functions
+3. **Be Responsive** - Design works beautifully on all devices
+4. **Be Fast** - Animations are smooth, loading is quick
+5. **Be Accessible** - Everyone can use what you build
+6. **Be Modern** - Use current design trends and technologies
+7. **Be Unique** - Each project should have its own personality
+8. **Be Intuitive** - Users shouldn't need instructions
+
+
+---
+
+# Project-Specific Customizations
+
+**IMPORTANT: This section contains the specific design requirements for THIS project. The guidelines above are universal best practices - these customizations below take precedence for project-specific decisions.**
+
+## User Design Requirements
+
+# PulseBoard — Development Blueprint
+
+## Project Concept
+PulseBoard is a web application that provides fast, objective company health analyses for founders, small business owners, consultants, agencies, and early-stage investors. It collects structured company data across profile, financials, market, and social/brand channels, augments inputs with optional integrations (QuickBooks, Google Analytics, LinkedIn, Stripe), and uses an AI Analysis Engine (LLM) to produce an executive report containing SWOT, financial/market/social analysis, top risks, opportunities, prioritized action plans, and a multi-dimensional health score. The vision is a lightweight, guided tool that reduces manual, subjective analysis into repeatable, actionable insights, exportable as branded PDFs for client deliverables or internal decision making.
+
+AI app description: an LLM-driven analysis engine that transforms structured user inputs and integrated data into human-readable sections (executive summary, SWOT, risks/opportunities, action plan) and structured JSON outputs for scoring, reporting, and downstream UI rendering.
+
+## Problem Statement
+- Core problems:
+  - Company health data is fragmented across spreadsheets, accounting platforms, analytics, and social channels.
+  - Analysis is manual, slow, subjective, and inconsistent.
+  - Non-expert users lack frameworks to prioritize actions and detect risks early.
+- Who experiences these problems:
+  - Founders, small business owners, consultants/agencies, early-stage investors, and SMB finance/strategy managers.
+- Why these problems matter:
+  - Slow or poor analysis leads to missed opportunities, unmanaged risks, inefficient prioritization, and poor investment decisions.
+- Current state / gaps:
+  - No simple tool that aggregates structured inputs + optional integrations and produces an objective, actionable health report optimized for SMB contexts.
+  - Existing BI/consulting workflows are heavy, expensive, or require specialized skills.
+
+## Solution
+PulseBoard solves these problems by:
+- Capturing essential structured inputs via guided forms: company profile, financials, market, and social data.
+- Optionally connecting to integrations (QuickBooks, GA4, LinkedIn, Stripe) or importing CSVs to reduce manual entry.
+- Running an AI Analysis Engine that returns a report (text + structured JSON) with executive summary, SWOT, financial/market/social analyses, risks, opportunities, prioritized actions, and health scores.
+- Presenting results in an editable Report Viewer and enabling PDF export with branding/white-label options for consultants.
+Approach and methodology:
+- Structured inputs to constrain AI prompts and improve signal quality.
+- Tiered analysis depth (brief, standard, deep) with optional benchmarks.
+- Health Scoring Engine combining rule-based weights and optional industry benchmarks.
+Key differentiators:
+- SMB-optimized templates and guidance to reduce friction.
+- Single-company-first UX for quick onboarding and focus.
+- Editable AI outputs so users can refine results and retain final reports.
+Value creation:
+- Faster, repeatable company health evaluations, accessible to non-experts, and exportable for client-facing deliverables.
+
+## Requirements
+
+### 1. Pages (UI Screens)
+- Landing Page
+  - Purpose: Marketing and conversion.
+  - Key sections: Hero, feature cards, how-it-works, pricing teaser, testimonials, CTA.
+  - Contribution: Drives sign-ups and explains value.
+
+- Signup / Create Account
+  - Purpose: Account creation with optional social SSO.
+  - Key sections: Email/password, role, optional company name, plan toggle, consent.
+  - Contribution: Onboard users into product.
+
+- Email Verification
+  - Purpose: Verify user email.
+  - Key sections: Status banner, resend, continue CTA.
+  - Contribution: Secure onboarding and compliance.
+
+- Login / Password Reset
+  - Purpose: Authentication and recovery.
+  - Key sections: Email/password, social login, forgot password flow.
+  - Contribution: Secure access and account recovery.
+
+- Dashboard
+  - Purpose: Primary workspace (single-company focus).
+  - Key sections: Company header, overall health score, health breakdown cards, latest analysis, data completeness meter, integrations tile, quick actions.
+  - Contribution: At-a-glance health, prompt to generate analysis.
+
+- Create Company (Wizard)
+  - Purpose: Guided single-company setup.
+  - Key sections: Multi-step Profile → Financials → Market → Social → Review, data completeness, autosave.
+  - Contribution: Capture structured data with minimal friction.
+
+- Company Detail
+  - Purpose: Persistent company workspace.
+  - Key sections: Header with key stats, tabs (Overview, Financials, Market, Social, Reports, Activity), latest analysis card, data completeness and quick edits.
+  - Contribution: Central place to manage data and run analyses.
+
+- Financials Form
+  - Purpose: Collect financial metrics.
+  - Key sections: Numeric inputs (revenue, expenses, profit margin, cash, debt, CAC/LTV, customer concentration), file upload, calculators, help tips.
+  - Contribution: Feed scoring & AI analysis.
+
+- Market Data Form
+  - Purpose: Capture competitors and market context.
+  - Key sections: Competitor list (structured rows), pricing matrix, trends tags/snippets, opportunities/threats with priorities, autocomplete suggestions.
+  - Contribution: Informs market analysis and SWOT.
+
+- Social & Brand Form
+  - Purpose: Capture social presence & website metrics.
+  - Key sections: Channel rows, followers, engagement, posting frequency, GA integration tile or traffic input, reviews/ratings, CSV import.
+  - Contribution: Inputs for brand/social analysis and scoring.
+
+- Generate Analysis
+  - Purpose: Launch and monitor AI analysis job.
+  - Key sections: Data completeness checklist, analysis depth options, benchmarking toggle, consent for AI processing, progress indicator, logs, result card.
+  - Contribution: Run AI Analysis Engine and surface progress/results.
+
+- Report Viewer
+  - Purpose: View editable AI-generated report.
+  - Key sections: Header (company, date, share/export), sections (executive summary, SWOT, Financial, Market, Social, Risks, Opportunities, Action Plan), inline edit, feedback widget, download/share.
+  - Contribution: Final report review, edit, and export.
+
+- Export / PDF Settings
+  - Purpose: Configure and generate branded PDF.
+  - Key sections: Section includes/excludes, branding/logo options, orientation, export progress and download link.
+  - Contribution: Produce client-ready deliverables.
+
+- User Profile
+  - Purpose: Account management and preferences.
+  - Key sections: Profile, security (2FA), subscription summary, recent activity.
+  - Contribution: Security and account configuration.
+
+- Settings & Preferences
+  - Purpose: Integrations, notifications, team management, data import/export.
+  - Key sections: Integrations center, notification preferences, team invite, danger zone.
+  - Contribution: Manage integrations and account-level settings.
+
+- Admin - User Management
+  - Purpose: Administer users and migrations.
+  - Key sections: User table with filters, user detail modal, suspend/reactivate, impersonate (audit logged), export.
+  - Contribution: Support and admin control.
+
+- Admin Dashboard
+  - Purpose: Monitor product usage and health.
+  - Key sections: Metrics (companies created, reports generated), graphs, system queue, error rates.
+  - Contribution: Operational insights and monitoring.
+
+- Password Reset
+  - Purpose: Secure password reset flow.
+  - Key sections: Request, email confirmation, tokenized new password page.
+  - Contribution: Account recovery.
+
+### 2. Features
+- AI Analysis Engine
+  - Technical details: Server-side orchestration of LLM prompts to produce text and structured JSON outputs; depth options (brief/standard/deep); support for benchmarking; store raw LLM payload in Report record.
+  - Implementation notes: Use OpenAI (or chosen provider) with prompt templates; rate-limit and queue jobs; include retry and guardrails; consent capture before processing.
+  - Contribution: Core value — generates the report.
+
+- Health Scoring Engine
+  - Technical details: Rule-based weighted scoring combining normalized financial, market, and brand metrics; ability to ingest benchmarks for scaling.
+  - Implementation notes: Compute and store HealthScore entries for history; expose breakdown for UI and charts.
+  - Contribution: Quantifies company health.
+
+- User Authentication
+  - Technical details: Email/password, OAuth (Google, Microsoft, LinkedIn), email verification, password reset, optional 2FA.
+  - Implementation notes: Secure password hashing (bcrypt/argon2), session tokens (JWT or server sessions), Resend for emails via Resend provider.
+  - Contribution: Secure access control.
+
+- Integrations & Connectors
+  - Technical details: OAuth flows for QuickBooks, Google Analytics (GA4), LinkedIn Pages, Stripe; IntegrationCredential storage with encryptedPayload.
+  - Implementation notes: Token refresh, scope management, periodic sync jobs, mapping to single company entity.
+  - Contribution: Reduce manual entry and enrich analysis.
+
+- CSV Import Utility
+  - Technical details: Server-side parsing of uploaded CSVs (financials, social metrics, competitor lists); validation and mapping UI.
+  - Implementation notes: Use S3 presigned uploads; background parsing jobs; show import preview and mapping rules.
+  - Contribution: Flexible data ingestion path.
+
+- Report Export / PDF Generation
+  - Technical details: HTML/CSS PDF template rendering server-side (headless Chromium or PDF generator) with queued processing and S3 storage of PDFs.
+  - Implementation notes: Support white-label options, include company logo, produce shareable presigned URLs.
+  - Contribution: Deliverable output for users and clients.
+
+- Notifications & Emails
+  - Technical details: Transactional emails (verify, reset, analysis complete, export ready) via Resend; in-app notifications for job statuses.
+  - Implementation notes: Templates, retry policies, user notification preferences.
+  - Contribution: Keeps users informed.
+
+- Data Import & Export
+  - Technical details: CSV export/import, integrations export, user data export for compliance.
+  - Implementation notes: Provide audit logs for exports, rate limits.
+  - Contribution: Portability & compliance.
+
+- Audit Logs & Error Monitoring
+  - Technical details: AuditLog entries for critical actions; integrate with Sentry for exceptions/perf.
+  - Implementation notes: Ensure admin access, retention policy.
+  - Contribution: Security, troubleshooting, compliance.
+
+- Caching & Performance
+  - Technical details: Cache health scores, last analysis outputs, integration responses (TTL), and autosave drafts in Redis.
+  - Implementation notes: Invalidate caches on data updates or re-analysis.
+  - Contribution: Reduce latency and costs.
+
+- Search & Filter
+  - Technical details: Full-text search for reports and content; autosuggest for competitors and tags.
+  - Implementation notes: Use Elastic/Algolia for performance.
+  - Contribution: Quick access to content.
+
+- Admin Analytics
+  - Technical details: Metrics collection and dashboards for product decisions.
+  - Implementation notes: Capture key events (company_created, report_generated, analysis_time).
+  - Contribution: Track success metrics.
+
+- Company CRUD & Single-Company Mode Enforcement
+  - Technical details: Database unique constraint for companies per user/account; API middleware to enforce single-company behavior; replace/overwrite flows; migration job to detect users with >1 companies.
+  - Implementation notes: Return 403/409 when create attempted while a company exists; offer admin migration tool for multi-company cases; UI hides multi-company features.
+  - Contribution: Keeps product simple and focused.
+
+### 3. User Journeys
+- New User / Founder (Self-assessment)
+  1. Signup → verify email.
+  2. Redirect to Create Company wizard (Profile → Financials → Market → Social).
+  3. Fill required minimal fields; see data completeness meter.
+  4. Click Generate Analysis (choose depth standard).
+  5. System queues AI Analysis Engine; user sees progress.
+  6. Receive notification/email when ready.
+  7. Open Report Viewer, review, edit text, and download PDF.
+  8. Optionally connect QuickBooks/GA for future auto-syncs.
+
+- Consultant / Agency (Client analysis)
+  1. Signup and select Pro/Agency plan (billing flow).
+  2. Create or replace company (for client) via wizard or CSV import.
+  3. Import financials via QuickBooks/CSV; import web/social via GA/LinkedIn if available.
+  4. Generate deep analysis with benchmarking and white-label enabled.
+  5. Edit and finalize report; export branded PDF and share link with client.
+  6. Schedule recurring analyses (future feature) or run per engagement.
+
+- Investor (Pre-screen)
+  1. Signup → create company or import prospective target’s data via CSV.
+  2. Run brief analysis to get quick health score and risk/opportunity overview.
+  3. Use report to decide whether to proceed to deeper diligence.
+  4. Export or bookmark report for portfolio tracking.
+
+- Admin / Support
+  1. Login to Admin Dashboard.
+  2. Monitor metrics (reports generated, errors).
+  3. Use User Management to inspect accounts, suspend/reactivate, run migrations for users with multiple companies.
+  4. Respond to support requests and impersonate user if required (audit logged).
+
+## UI Guide
+- Color palette (design tokens):
+  - Primary: #0B6AF7 (Blue)
+  - Primary 700 (Dark): #064FD6
+  - Accent / Success: #16A34A (Green)
+  - Warning: #F59E0B (Amber)
+  - Danger: #DC2626 (Red)
+  - Neutral 900: #0F172A (Dark text)
+  - Neutral 700: #374151 (Secondary text)
+  - Neutral 100: #F3F4F6 (Background)
+  - White: #FFFFFF
+- Typography:
+  - UI font: Inter (variable) for headings and body.
+  - Heading scale: H1 28-32px semibold, H2 22-24px semibold, H3 16-18px medium.
+  - Body: 14-16px regular. Line-height 1.4-1.6.
+- Component specs:
+  - Buttons: Primary (filled primary), Secondary (outline neutral), Ghost (text). Corner radius 8px, padding 10–14px.
+  - Inputs: Single-line with 1px neutral border, 8px radius, inline help text, numeric inputs with unit suffixes.
+  - Cards: Elevation level 1, 16px padding, 12px border radius, clear header and body separation.
+  - Tabs: Horizontal, clear active underline, accessible keyboard focus.
+  - Modal: Centered, max-width 720px for wizards, overlay 40% opacity dark.
+  - Forms: Two-column layout for wide screens, single column on mobile; progressive disclosure for advanced fields.
+- Layout principles:
+  - Responsive grid: 12-column system, gutters 16px.
+  - Spacing scale: 4,8,12,16,24,32,40.
+  - Prioritize clarity: concise labels, inline examples, tooltips for complex fields.
+- Visual style & mood:
+  - Professional, optimistic, and actionable. Use data visualizations sparingly and prioritize clear, readable content.
+  - Illustrations: light, flat onboarding illustrations; report visuals should be clean and data-focused.
+- Component patterns:
+  - Data completeness meter: circular or linear with percent and click-to-jump anchors.
+  - Report sections: collapsible panels with edit mode toggles and save snapshot controls.
+  - Analysis progress: stepper + live log + estimated time.
+
+## Instructions to AI Development Tool
+This blueprint provides the complete context needed to build this application. When implementing any part of this project:
+1. Refer back to the Project Concept, Problem Statement, and Solution sections to understand the "why" behind each requirement
+2. Ensure all features and pages align with solving the identified problems
+3. Verify all features and pages are built according to specifications before completing the project
+4. Pay special attention to the UI Guide section and ensure all visual elements follow the design system exactly
+5. Maintain consistency with the overall solution approach throughout implementation
+
+1. Prioritize single-company mode flows: hide multi-company UI, enforce DB unique constraints, and route users to onboarding or company detail as described.
+2. Implement AI Analysis Engine as queued background jobs; capture raw outputs in Report.payload, store status, and surface progress to the user.
+3. Use structured prompts and JSON schema responses from the LLM to populate Report (executiveSummary, swot, financialAnalysis, marketAnalysis, socialAnalysis, risks[], opportunities[], actionPlan[], healthScores).
+4. Integrations must follow OAuth best practices, store encrypted tokens in IntegrationCredential, and map credentials to the active company.
+5. PDF generation must use server-side rendering with a queued worker and store final PDFs in S3 with presigned URLs.
+6. Add robust validation and inline guidance in forms to improve AI output quality; show data completeness and require minimal fields before enabling standard analysis.
+7. Capture telemetry events for all key actions: company_created, analysis_started, analysis_completed, report_exported, integration_connected, user_signup.
+8. Implement audit logging for admin actions and sensitive operations; integrate Sentry for error monitoring and alerting.
+9. Provide admin migration tooling to handle users with >1 companies (dry-run, merge/select primary with audit logs).
+10. Include unit/integration tests for single-company enforcement, AI job retry logic, PDF export pipeline, and integration token refresh flows.
+
+Designers / Developers should rely on the provided data model, assets, and UX flows. Validate AI outputs for safety and relevance, and surface editable text for user refinement to avoid generic or inaccurate recommendations.
+
+## Implementation Notes
+
+When implementing this project:
+
+1. **Follow Universal Guidelines**: Use the design best practices documented above as your foundation
+2. **Apply Project Customizations**: Implement the specific design requirements stated in the "User Design Requirements" section
+3. **Priority Order**: Project-specific requirements override universal guidelines when there's a conflict
+4. **Color System**: Extract and implement color values as CSS custom properties in RGB format
+5. **Typography**: Define font families, sizes, and weights based on specifications
+6. **Spacing**: Establish consistent spacing scale following the design system
+7. **Components**: Style all Shadcn components to match the design aesthetic
+8. **Animations**: Use Motion library for transitions matching the design personality
+9. **Responsive Design**: Ensure mobile-first responsive implementation
+
+## Implementation Checklist
+
+- [ ] Review universal design guidelines above
+- [ ] Extract project-specific color palette and define CSS variables
+- [ ] Configure Tailwind theme with custom colors
+- [ ] Set up typography system (fonts, sizes, weights)
+- [ ] Define spacing and sizing scales
+- [ ] Create component variants matching design
+- [ ] Implement responsive breakpoints
+- [ ] Add animations and transitions
+- [ ] Ensure accessibility standards
+- [ ] Validate against user design requirements
+
+---
+
+**Remember: Always reference this file for design decisions. Do not use generic or placeholder designs.**
+
+
+*IMPORTANT*: For every page or component refer to # Modern Design Best Practices
+
+## Philosophy
+
+Create unique, memorable experiences while maintaining consistency through modern design principles. Every project should feel distinct yet professional, innovative yet intuitive.
+
+---
+
+## Landing Pages & Marketing Sites
+
+### Hero Sections
+**Go beyond static backgrounds:**
+- Animated gradients with subtle movement
+- Particle systems or geometric shapes floating
+- Interactive canvas backgrounds (Three.js, WebGL)
+- Video backgrounds with proper fallbacks
+- Parallax scrolling effects
+- Gradient mesh animations
+- Morphing blob animations
+
+
+### Layout Patterns
+**Use modern grid systems:**
+- Bento grids (asymmetric card layouts)
+- Masonry layouts for varied content
+- Feature sections with diagonal cuts or curves
+- Overlapping elements with proper z-index
+- Split-screen designs with scroll-triggered reveals
+
+**Avoid:** Traditional 3-column equal grids
+
+### Scroll Animations
+**Engage users as they scroll:**
+- Fade-in and slide-up animations for sections
+- Scroll-triggered parallax effects
+- Progress indicators for long pages
+- Sticky elements that transform on scroll
+- Horizontal scroll sections for portfolios
+- Text reveal animations (word by word, letter by letter)
+- Number counters animating into view
+
+**Avoid:** Static pages with no scroll interaction
+
+### Call-to-Action Areas
+**Make CTAs impossible to miss:**
+- Gradient buttons with hover effects
+- Floating action buttons with micro-interactions
+- Animated borders or glowing effects
+- Scale/lift on hover
+- Interactive elements that respond to mouse position
+- Pulsing indicators for primary actions
+
+---
+
+## Dashboard Applications
+
+### Layout Structure
+**Always use collapsible side navigation:**
+- Sidebar that can collapse to icons only
+- Smooth transition animations between states
+- Persistent navigation state (remember user preference)
+- Mobile: drawer that slides in/out
+- Desktop: sidebar with expand/collapse toggle
+- Icons visible even when collapsed
+
+**Structure:**
+```
+/dashboard (layout wrapper with sidebar)
+  /dashboard/overview
+  /dashboard/analytics
+  /dashboard/settings
+  /dashboard/users
+  /dashboard/projects
+```
+
+All dashboard pages should be nested inside the dashboard layout, not separate routes.
+
+### Data Tables
+**Modern table design:**
+- Sticky headers on scroll
+- Row hover states with subtle elevation
+- Sortable columns with clear indicators
+- Pagination with items-per-page control
+- Search/filter with instant feedback
+- Selection checkboxes with bulk actions
+- Responsive: cards on mobile, table on desktop
+- Loading skeletons, not spinners
+- Empty states with illustrations or helpful text
+
+**Use modern table libraries:**
+- TanStack Table (React Table v8)
+- AG Grid for complex data
+- Data Grid from MUI (if using MUI)
+
+### Charts & Visualizations
+**Use the latest charting libraries:**
+- Recharts (for React, simple charts)
+- Chart.js v4 (versatile, well-maintained)
+- Apache ECharts (advanced, interactive)
+- D3.js (custom, complex visualizations)
+- Tremor (for dashboards, built on Recharts)
+
+**Chart best practices:**
+- Animated transitions when data changes
+- Interactive tooltips with detailed info
+- Responsive sizing
+- Color scheme matching design system
+- Legend placement that doesn't obstruct data
+- Loading states while fetching data
+
+### Dashboard Cards
+**Metric cards should stand out:**
+- Gradient backgrounds or colored accents
+- Trend indicators (↑ ↓ with color coding)
+- Sparkline charts for historical data
+- Hover effects revealing more detail
+- Icon representing the metric
+- Comparison to previous period
+
+---
+
+## Color & Visual Design
+
+### Color Palettes
+**Create depth with gradients:**
+- Primary gradient (not just solid primary color)
+- Subtle background gradients
+- Gradient text for headings
+- Gradient borders on cards
+- Elevated surfaces for depth
+
+**Color usage:**
+- 60-30-10 rule (dominant, secondary, accent)
+- Consistent semantic colors (success, warning, error)
+- Accessible contrast ratios (WCAG AA minimum)
+
+### Typography
+**Create hierarchy through contrast:**
+- Large, bold headings (48-72px for heroes)
+- Clear size differences between levels
+- Variable font weights (300, 400, 600, 700)
+- Letter spacing for small caps
+- Line height 1.5-1.7 for body text
+- Inter, Poppins, or DM Sans for modern feel
+
+### Shadows & Depth
+**Layer UI elements:**
+- Multi-layer shadows for realistic depth
+- Colored shadows matching element color
+- Elevated states on hover
+- Neumorphism for special elements (sparingly)
+
+---
+
+## Interactions & Micro-animations
+
+### Button Interactions
+**Every button should react:**
+- Scale slightly on hover (1.02-1.05)
+- Lift with shadow on hover
+- Ripple effect on click
+- Loading state with spinner or progress
+- Disabled state clearly visible
+- Success state with checkmark animation
+
+### Card Interactions
+**Make cards feel alive:**
+- Lift on hover with increased shadow
+- Subtle border glow on hover
+- Tilt effect following mouse (3D transform)
+- Smooth transitions (200-300ms)
+- Click feedback for interactive cards
+
+### Form Interactions
+**Guide users through forms:**
+- Input focus states with border color change
+- Floating labels that animate up
+- Real-time validation with inline messages
+- Success checkmarks for valid inputs
+- Error states with shake animation
+- Password strength indicators
+- Character count for text areas
+
+### Page Transitions
+**Smooth between views:**
+- Fade + slide for page changes
+- Skeleton loaders during data fetch
+- Optimistic UI updates
+- Stagger animations for lists
+- Route transition animations
+
+---
+
+## Mobile Responsiveness
+
+### Mobile-First Approach
+**Design for mobile, enhance for desktop:**
+- Touch targets minimum 44x44px
+- Generous padding and spacing
+- Sticky bottom navigation on mobile
+- Collapsible sections for long content
+- Swipeable cards and galleries
+- Pull-to-refresh where appropriate
+
+### Responsive Patterns
+**Adapt layouts intelligently:**
+- Hamburger menu → full nav bar
+- Card grid → stack on mobile
+- Sidebar → drawer
+- Multi-column → single column
+- Data tables → card list
+- Hide/show elements based on viewport
+
+---
+
+## Loading & Empty States
+
+### Loading States
+**Never leave users wondering:**
+- Skeleton screens matching content layout
+- Progress bars for known durations
+- Animated placeholders
+- Spinners only for short waits (<3s)
+- Stagger loading for multiple elements
+- Shimmer effects on skeletons
+
+### Empty States
+**Make empty states helpful:**
+- Illustrations or icons
+- Helpful copy explaining why it's empty
+- Clear CTA to add first item
+- Examples or suggestions
+- No "no data" text alone
+
+---
+
+## Unique Elements to Stand Out
+
+### Distinctive Features
+**Add personality:**
+- Custom cursor effects on landing pages
+- Animated page numbers or section indicators
+- Unusual hover effects (magnification, distortion)
+- Custom scrollbars
+- Glassmorphism for overlays
+- Animated SVG icons
+- Typewriter effects for hero text
+- Confetti or celebration animations for actions
+
+### Interactive Elements
+**Engage users:**
+- Drag-and-drop interfaces
+- Sliders and range controls
+- Toggle switches with animations
+- Progress steps with animations
+- Expandable/collapsible sections
+- Tabs with slide indicators
+- Image comparison sliders
+- Interactive demos or playgrounds
+
+---
+
+## Consistency Rules
+
+### Maintain Consistency
+**What should stay consistent:**
+- Spacing scale (4px, 8px, 16px, 24px, 32px, 48px, 64px)
+- Border radius values
+- Animation timing (200ms, 300ms, 500ms)
+- Color system (primary, secondary, accent, neutrals)
+- Typography scale
+- Icon style (outline vs filled)
+- Button styles across the app
+- Form element styles
+
+### What Can Vary
+**Project-specific customization:**
+- Color palette (different colors, same system)
+- Layout creativity (grids, asymmetry)
+- Illustration style
+- Animation personality
+- Feature-specific interactions
+- Hero section design
+- Card styling variations
+- Background patterns or textures
+
+---
+
+## Technical Excellence
+
+### Performance
+- Optimize images (WebP, lazy loading)
+- Code splitting for faster loads
+- Debounce search inputs
+- Virtualize long lists
+- Minimize re-renders
+- Use proper memoization
+
+### Accessibility
+- Keyboard navigation throughout
+- ARIA labels where needed
+- Focus indicators visible
+- Screen reader friendly
+- Sufficient color contrast
+- Respect reduced motion preferences
+
+---
+
+## Key Principles
+
+1. **Be Bold** - Don't be afraid to try unique layouts and interactions
+2. **Be Consistent** - Use the same patterns for similar functions
+3. **Be Responsive** - Design works beautifully on all devices
+4. **Be Fast** - Animations are smooth, loading is quick
+5. **Be Accessible** - Everyone can use what you build
+6. **Be Modern** - Use current design trends and technologies
+7. **Be Unique** - Each project should have its own personality
+8. **Be Intuitive** - Users shouldn't need instructions
+
+
+---
+
+# Project-Specific Customizations
+
+**IMPORTANT: This section contains the specific design requirements for THIS project. The guidelines above are universal best practices - these customizations below take precedence for project-specific decisions.**
+
+## User Design Requirements
+
+# PulseBoard — Development Blueprint
+
+## Project Concept
+PulseBoard is a web application that provides fast, objective company health analyses for founders, small business owners, consultants, agencies, and early-stage investors. It collects structured company data across profile, financials, market, and social/brand channels, augments inputs with optional integrations (QuickBooks, Google Analytics, LinkedIn, Stripe), and uses an AI Analysis Engine (LLM) to produce an executive report containing SWOT, financial/market/social analysis, top risks, opportunities, prioritized action plans, and a multi-dimensional health score. The vision is a lightweight, guided tool that reduces manual, subjective analysis into repeatable, actionable insights, exportable as branded PDFs for client deliverables or internal decision making.
+
+AI app description: an LLM-driven analysis engine that transforms structured user inputs and integrated data into human-readable sections (executive summary, SWOT, risks/opportunities, action plan) and structured JSON outputs for scoring, reporting, and downstream UI rendering.
+
+## Problem Statement
+- Core problems:
+  - Company health data is fragmented across spreadsheets, accounting platforms, analytics, and social channels.
+  - Analysis is manual, slow, subjective, and inconsistent.
+  - Non-expert users lack frameworks to prioritize actions and detect risks early.
+- Who experiences these problems:
+  - Founders, small business owners, consultants/agencies, early-stage investors, and SMB finance/strategy managers.
+- Why these problems matter:
+  - Slow or poor analysis leads to missed opportunities, unmanaged risks, inefficient prioritization, and poor investment decisions.
+- Current state / gaps:
+  - No simple tool that aggregates structured inputs + optional integrations and produces an objective, actionable health report optimized for SMB contexts.
+  - Existing BI/consulting workflows are heavy, expensive, or require specialized skills.
+
+## Solution
+PulseBoard solves these problems by:
+- Capturing essential structured inputs via guided forms: company profile, financials, market, and social data.
+- Optionally connecting to integrations (QuickBooks, GA4, LinkedIn, Stripe) or importing CSVs to reduce manual entry.
+- Running an AI Analysis Engine that returns a report (text + structured JSON) with executive summary, SWOT, financial/market/social analyses, risks, opportunities, prioritized actions, and health scores.
+- Presenting results in an editable Report Viewer and enabling PDF export with branding/white-label options for consultants.
+Approach and methodology:
+- Structured inputs to constrain AI prompts and improve signal quality.
+- Tiered analysis depth (brief, standard, deep) with optional benchmarks.
+- Health Scoring Engine combining rule-based weights and optional industry benchmarks.
+Key differentiators:
+- SMB-optimized templates and guidance to reduce friction.
+- Single-company-first UX for quick onboarding and focus.
+- Editable AI outputs so users can refine results and retain final reports.
+Value creation:
+- Faster, repeatable company health evaluations, accessible to non-experts, and exportable for client-facing deliverables.
+
+## Requirements
+
+### 1. Pages (UI Screens)
+- Landing Page
+  - Purpose: Marketing and conversion.
+  - Key sections: Hero, feature cards, how-it-works, pricing teaser, testimonials, CTA.
+  - Contribution: Drives sign-ups and explains value.
+
+- Signup / Create Account
+  - Purpose: Account creation with optional social SSO.
+  - Key sections: Email/password, role, optional company name, plan toggle, consent.
+  - Contribution: Onboard users into product.
+
+- Email Verification
+  - Purpose: Verify user email.
+  - Key sections: Status banner, resend, continue CTA.
+  - Contribution: Secure onboarding and compliance.
+
+- Login / Password Reset
+  - Purpose: Authentication and recovery.
+  - Key sections: Email/password, social login, forgot password flow.
+  - Contribution: Secure access and account recovery.
+
+- Dashboard
+  - Purpose: Primary workspace (single-company focus).
+  - Key sections: Company header, overall health score, health breakdown cards, latest analysis, data completeness meter, integrations tile, quick actions.
+  - Contribution: At-a-glance health, prompt to generate analysis.
+
+- Create Company (Wizard)
+  - Purpose: Guided single-company setup.
+  - Key sections: Multi-step Profile → Financials → Market → Social → Review, data completeness, autosave.
+  - Contribution: Capture structured data with minimal friction.
+
+- Company Detail
+  - Purpose: Persistent company workspace.
+  - Key sections: Header with key stats, tabs (Overview, Financials, Market, Social, Reports, Activity), latest analysis card, data completeness and quick edits.
+  - Contribution: Central place to manage data and run analyses.
+
+- Financials Form
+  - Purpose: Collect financial metrics.
+  - Key sections: Numeric inputs (revenue, expenses, profit margin, cash, debt, CAC/LTV, customer concentration), file upload, calculators, help tips.
+  - Contribution: Feed scoring & AI analysis.
+
+- Market Data Form
+  - Purpose: Capture competitors and market context.
+  - Key sections: Competitor list (structured rows), pricing matrix, trends tags/snippets, opportunities/threats with priorities, autocomplete suggestions.
+  - Contribution: Informs market analysis and SWOT.
+
+- Social & Brand Form
+  - Purpose: Capture social presence & website metrics.
+  - Key sections: Channel rows, followers, engagement, posting frequency, GA integration tile or traffic input, reviews/ratings, CSV import.
+  - Contribution: Inputs for brand/social analysis and scoring.
+
+- Generate Analysis
+  - Purpose: Launch and monitor AI analysis job.
+  - Key sections: Data completeness checklist, analysis depth options, benchmarking toggle, consent for AI processing, progress indicator, logs, result card.
+  - Contribution: Run AI Analysis Engine and surface progress/results.
+
+- Report Viewer
+  - Purpose: View editable AI-generated report.
+  - Key sections: Header (company, date, share/export), sections (executive summary, SWOT, Financial, Market, Social, Risks, Opportunities, Action Plan), inline edit, feedback widget, download/share.
+  - Contribution: Final report review, edit, and export.
+
+- Export / PDF Settings
+  - Purpose: Configure and generate branded PDF.
+  - Key sections: Section includes/excludes, branding/logo options, orientation, export progress and download link.
+  - Contribution: Produce client-ready deliverables.
+
+- User Profile
+  - Purpose: Account management and preferences.
+  - Key sections: Profile, security (2FA), subscription summary, recent activity.
+  - Contribution: Security and account configuration.
+
+- Settings & Preferences
+  - Purpose: Integrations, notifications, team management, data import/export.
+  - Key sections: Integrations center, notification preferences, team invite, danger zone.
+  - Contribution: Manage integrations and account-level settings.
+
+- Admin - User Management
+  - Purpose: Administer users and migrations.
+  - Key sections: User table with filters, user detail modal, suspend/reactivate, impersonate (audit logged), export.
+  - Contribution: Support and admin control.
+
+- Admin Dashboard
+  - Purpose: Monitor product usage and health.
+  - Key sections: Metrics (companies created, reports generated), graphs, system queue, error rates.
+  - Contribution: Operational insights and monitoring.
+
+- Password Reset
+  - Purpose: Secure password reset flow.
+  - Key sections: Request, email confirmation, tokenized new password page.
+  - Contribution: Account recovery.
+
+### 2. Features
+- AI Analysis Engine
+  - Technical details: Server-side orchestration of LLM prompts to produce text and structured JSON outputs; depth options (brief/standard/deep); support for benchmarking; store raw LLM payload in Report record.
+  - Implementation notes: Use OpenAI (or chosen provider) with prompt templates; rate-limit and queue jobs; include retry and guardrails; consent capture before processing.
+  - Contribution: Core value — generates the report.
+
+- Health Scoring Engine
+  - Technical details: Rule-based weighted scoring combining normalized financial, market, and brand metrics; ability to ingest benchmarks for scaling.
+  - Implementation notes: Compute and store HealthScore entries for history; expose breakdown for UI and charts.
+  - Contribution: Quantifies company health.
+
+- User Authentication
+  - Technical details: Email/password, OAuth (Google, Microsoft, LinkedIn), email verification, password reset, optional 2FA.
+  - Implementation notes: Secure password hashing (bcrypt/argon2), session tokens (JWT or server sessions), Resend for emails via Resend provider.
+  - Contribution: Secure access control.
+
+- Integrations & Connectors
+  - Technical details: OAuth flows for QuickBooks, Google Analytics (GA4), LinkedIn Pages, Stripe; IntegrationCredential storage with encryptedPayload.
+  - Implementation notes: Token refresh, scope management, periodic sync jobs, mapping to single company entity.
+  - Contribution: Reduce manual entry and enrich analysis.
+
+- CSV Import Utility
+  - Technical details: Server-side parsing of uploaded CSVs (financials, social metrics, competitor lists); validation and mapping UI.
+  - Implementation notes: Use S3 presigned uploads; background parsing jobs; show import preview and mapping rules.
+  - Contribution: Flexible data ingestion path.
+
+- Report Export / PDF Generation
+  - Technical details: HTML/CSS PDF template rendering server-side (headless Chromium or PDF generator) with queued processing and S3 storage of PDFs.
+  - Implementation notes: Support white-label options, include company logo, produce shareable presigned URLs.
+  - Contribution: Deliverable output for users and clients.
+
+- Notifications & Emails
+  - Technical details: Transactional emails (verify, reset, analysis complete, export ready) via Resend; in-app notifications for job statuses.
+  - Implementation notes: Templates, retry policies, user notification preferences.
+  - Contribution: Keeps users informed.
+
+- Data Import & Export
+  - Technical details: CSV export/import, integrations export, user data export for compliance.
+  - Implementation notes: Provide audit logs for exports, rate limits.
+  - Contribution: Portability & compliance.
+
+- Audit Logs & Error Monitoring
+  - Technical details: AuditLog entries for critical actions; integrate with Sentry for exceptions/perf.
+  - Implementation notes: Ensure admin access, retention policy.
+  - Contribution: Security, troubleshooting, compliance.
+
+- Caching & Performance
+  - Technical details: Cache health scores, last analysis outputs, integration responses (TTL), and autosave drafts in Redis.
+  - Implementation notes: Invalidate caches on data updates or re-analysis.
+  - Contribution: Reduce latency and costs.
+
+- Search & Filter
+  - Technical details: Full-text search for reports and content; autosuggest for competitors and tags.
+  - Implementation notes: Use Elastic/Algolia for performance.
+  - Contribution: Quick access to content.
+
+- Admin Analytics
+  - Technical details: Metrics collection and dashboards for product decisions.
+  - Implementation notes: Capture key events (company_created, report_generated, analysis_time).
+  - Contribution: Track success metrics.
+
+- Company CRUD & Single-Company Mode Enforcement
+  - Technical details: Database unique constraint for companies per user/account; API middleware to enforce single-company behavior; replace/overwrite flows; migration job to detect users with >1 companies.
+  - Implementation notes: Return 403/409 when create attempted while a company exists; offer admin migration tool for multi-company cases; UI hides multi-company features.
+  - Contribution: Keeps product simple and focused.
+
+### 3. User Journeys
+- New User / Founder (Self-assessment)
+  1. Signup → verify email.
+  2. Redirect to Create Company wizard (Profile → Financials → Market → Social).
+  3. Fill required minimal fields; see data completeness meter.
+  4. Click Generate Analysis (choose depth standard).
+  5. System queues AI Analysis Engine; user sees progress.
+  6. Receive notification/email when ready.
+  7. Open Report Viewer, review, edit text, and download PDF.
+  8. Optionally connect QuickBooks/GA for future auto-syncs.
+
+- Consultant / Agency (Client analysis)
+  1. Signup and select Pro/Agency plan (billing flow).
+  2. Create or replace company (for client) via wizard or CSV import.
+  3. Import financials via QuickBooks/CSV; import web/social via GA/LinkedIn if available.
+  4. Generate deep analysis with benchmarking and white-label enabled.
+  5. Edit and finalize report; export branded PDF and share link with client.
+  6. Schedule recurring analyses (future feature) or run per engagement.
+
+- Investor (Pre-screen)
+  1. Signup → create company or import prospective target’s data via CSV.
+  2. Run brief analysis to get quick health score and risk/opportunity overview.
+  3. Use report to decide whether to proceed to deeper diligence.
+  4. Export or bookmark report for portfolio tracking.
+
+- Admin / Support
+  1. Login to Admin Dashboard.
+  2. Monitor metrics (reports generated, errors).
+  3. Use User Management to inspect accounts, suspend/reactivate, run migrations for users with multiple companies.
+  4. Respond to support requests and impersonate user if required (audit logged).
+
+## UI Guide
+- Color palette (design tokens):
+  - Primary: #0B6AF7 (Blue)
+  - Primary 700 (Dark): #064FD6
+  - Accent / Success: #16A34A (Green)
+  - Warning: #F59E0B (Amber)
+  - Danger: #DC2626 (Red)
+  - Neutral 900: #0F172A (Dark text)
+  - Neutral 700: #374151 (Secondary text)
+  - Neutral 100: #F3F4F6 (Background)
+  - White: #FFFFFF
+- Typography:
+  - UI font: Inter (variable) for headings and body.
+  - Heading scale: H1 28-32px semibold, H2 22-24px semibold, H3 16-18px medium.
+  - Body: 14-16px regular. Line-height 1.4-1.6.
+- Component specs:
+  - Buttons: Primary (filled primary), Secondary (outline neutral), Ghost (text). Corner radius 8px, padding 10–14px.
+  - Inputs: Single-line with 1px neutral border, 8px radius, inline help text, numeric inputs with unit suffixes.
+  - Cards: Elevation level 1, 16px padding, 12px border radius, clear header and body separation.
+  - Tabs: Horizontal, clear active underline, accessible keyboard focus.
+  - Modal: Centered, max-width 720px for wizards, overlay 40% opacity dark.
+  - Forms: Two-column layout for wide screens, single column on mobile; progressive disclosure for advanced fields.
+- Layout principles:
+  - Responsive grid: 12-column system, gutters 16px.
+  - Spacing scale: 4,8,12,16,24,32,40.
+  - Prioritize clarity: concise labels, inline examples, tooltips for complex fields.
+- Visual style & mood:
+  - Professional, optimistic, and actionable. Use data visualizations sparingly and prioritize clear, readable content.
+  - Illustrations: light, flat onboarding illustrations; report visuals should be clean and data-focused.
+- Component patterns:
+  - Data completeness meter: circular or linear with percent and click-to-jump anchors.
+  - Report sections: collapsible panels with edit mode toggles and save snapshot controls.
+  - Analysis progress: stepper + live log + estimated time.
+
+## Instructions to AI Development Tool
+This blueprint provides the complete context needed to build this application. When implementing any part of this project:
+1. Refer back to the Project Concept, Problem Statement, and Solution sections to understand the "why" behind each requirement
+2. Ensure all features and pages align with solving the identified problems
+3. Verify all features and pages are built according to specifications before completing the project
+4. Pay special attention to the UI Guide section and ensure all visual elements follow the design system exactly
+5. Maintain consistency with the overall solution approach throughout implementation
+
+1. Prioritize single-company mode flows: hide multi-company UI, enforce DB unique constraints, and route users to onboarding or company detail as described.
+2. Implement AI Analysis Engine as queued background jobs; capture raw outputs in Report.payload, store status, and surface progress to the user.
+3. Use structured prompts and JSON schema responses from the LLM to populate Report (executiveSummary, swot, financialAnalysis, marketAnalysis, socialAnalysis, risks[], opportunities[], actionPlan[], healthScores).
+4. Integrations must follow OAuth best practices, store encrypted tokens in IntegrationCredential, and map credentials to the active company.
+5. PDF generation must use server-side rendering with a queued worker and store final PDFs in S3 with presigned URLs.
+6. Add robust validation and inline guidance in forms to improve AI output quality; show data completeness and require minimal fields before enabling standard analysis.
+7. Capture telemetry events for all key actions: company_created, analysis_started, analysis_completed, report_exported, integration_connected, user_signup.
+8. Implement audit logging for admin actions and sensitive operations; integrate Sentry for error monitoring and alerting.
+9. Provide admin migration tooling to handle users with >1 companies (dry-run, merge/select primary with audit logs).
+10. Include unit/integration tests for single-company enforcement, AI job retry logic, PDF export pipeline, and integration token refresh flows.
+
+Designers / Developers should rely on the provided data model, assets, and UX flows. Validate AI outputs for safety and relevance, and surface editable text for user refinement to avoid generic or inaccurate recommendations.
+
+## Implementation Notes
+
+When implementing this project:
+
+1. **Follow Universal Guidelines**: Use the design best practices documented above as your foundation
+2. **Apply Project Customizations**: Implement the specific design requirements stated in the "User Design Requirements" section
+3. **Priority Order**: Project-specific requirements override universal guidelines when there's a conflict
+4. **Color System**: Extract and implement color values as CSS custom properties in RGB format
+5. **Typography**: Define font families, sizes, and weights based on specifications
+6. **Spacing**: Establish consistent spacing scale following the design system
+7. **Components**: Style all Shadcn components to match the design aesthetic
+8. **Animations**: Use Motion library for transitions matching the design personality
+9. **Responsive Design**: Ensure mobile-first responsive implementation
+
+## Implementation Checklist
+
+- [ ] Review universal design guidelines above
+- [ ] Extract project-specific color palette and define CSS variables
+- [ ] Configure Tailwind theme with custom colors
+- [ ] Set up typography system (fonts, sizes, weights)
+- [ ] Define spacing and sizing scales
+- [ ] Create component variants matching design
+- [ ] Implement responsive breakpoints
+- [ ] Add animations and transitions
+- [ ] Ensure accessibility standards
+- [ ] Validate against user design requirements
+
+---
+
+**Remember: Always reference this file for design decisions. Do not use generic or placeholder designs.**
+ for bestpractices and # Report Viewer
+
+## Overview
+You will build a feature-complete, scalable Report Viewer for PulseBoard — a single-analysis AI-generated report with editable text blocks, snapshots, and rich data integration. The system includes caching, health scoring, AI orchestration, export/PDF generation, notifications, and an export settings workflow. All code must be resilient to null/undefined values and guard against typical runtime pitfalls (per the Runtime Safety rules below). Implement authentication and core data setup before dashboard/workspace/analytics tasks when both are present.
+
+---
+
+## Page Description (Full Detail)
+What this page is:
+- The Report Viewer page renders a full AI-generated report for a single company analysis, including: executive summary, SWOT, financial analysis, market analysis, social analysis, top risks, opportunities, and a prioritized action plan.
+- The page supports inline edits to AI-generated text blocks, saving snapshots of user refinements, and exporting the report as a branded PDF. It also provides a shareable/export-ready link.
+
+Goals:
+- Deliver a human-readable, AI-driven, deeply structured report with editable blocks and persistent snapshots.
+- Seamlessly integrate with caching, health scoring, AI analysis engine, export pipeline, and notification systems.
+- Provide a clean, responsive UI with sections, charts, in-place editing, progress indicators, and action-oriented controls (save, export, share, snapshot management).
+
+Connected features:
+- Caching & Performance: Cache computed results, external integration responses, and frequently used data to reduce latency and API costs.
+- Health Scoring Engine: Compute overall company health and sub-scores (financial, market, brand/social) using weighted rules and optional benchmarking against industry norms.
+- Report Export / PDF Generation: Server-side PDF generation with branding options and queued processing for large exports.
+- AI Analysis Engine: Orchestrates AI prompts to generate executive summary, SWOT, financial/market/social analysis, risks, opportunities, and prioritized action plan. Supports depth levels and optional benchmarks.
+- Notifications & Emails: Transactional and in-app notifications for completed analyses, export ready, failed jobs, billing, and admin alerts. Uses an email provider and in-app inbox.
+
+UI elements and guidance:
+- Report header: Title, Company name, Analysis date, Share/export buttons, status badge (draft/completed).
+- Editable blocks: Inline text editors for each major section (Executive Summary, SWOT, Financial Analysis, Market Analysis, Social Analysis, Risks, Opportunities, Action Plan).
+- Visual components: Section dividers, chart placeholders (fin/market/social), health score meters, and a compact KPI strip.
+- Snapshots: Optional saved states of edits with timestamp, author, and notes.
+- Export controls: PDF/HTML export button, branding options, page orientation, include/exclude sections, file format, and an export progress indicator with a final download link.
+- Notifications: In-app inbox area and a top-right notifications bell.
+- Design system: Follow the project’s design system for typography, spacing, colors, and components. Ensure accessibility (ARIA labels, keyboard navigation).
+
+API integrations:
+- No external APIs are required for this page (per PROJECT CONTEXT). All data can be simulated or stored in Supabase/Postgres as part of your data layer. The AI prompts are orchestrated via the AI Analysis Engine module (internal orchestration).
+
+Asset:
+- [asset] Report PDF Template: HTML/CSS template for rendering the PDF with branding and white-label options. Used by the server-side PDF generator.
+
+Connected Page:
+- [page] Export / PDF Settings: UI to customize what goes into the PDF, branding, orientation, and export options, plus export progress and download link.
+
+---
+
+## Components to Build
+- ReportViewerPage
+  - Props: analysisId, companyId, userId
+  - State: reportData, isLoading, isExporting, editDrafts, snapshots, healthScores
+  - Subcomponents:
+    - SectionEditor (reusable inline editor with autosave)
+    - HealthScorePanel (overall score + sub-scores)
+    - KPIChart (Financial, Market, Brand/Social visualizations)
+    - SnapshotManager (save, list, restore, annotate)
+    - ExportPanel (branding options, page orientation, format, status)
+    - PDFPreviewPlaceholder (link to generated PDF)
+    - NotificationToast/InAppInbox access
+- CacheLayer
+  - Functions to cache results, external responses, and frequently used data
+- HealthScoringEngine
+  - Compute overall health and sub-scores with weighted rules and optional benchmarking
+- AIAnalysisEngine
+  - Orchestrates prompts for each section; accepts depth level and optional benchmarks
+- PDFExportService
+  - Server-side generation, queueing, branding, and delivery
+- NotificationsModule
+  - In-app and email notifications for events
+- ReportPdfTemplate
+  - HTML/CSS template used by PDF generator
+- SettingsPanel (Export / PDF Settings)
+  - UI to include/exclude sections, branding, orientation, format
+
+---
+
+## Implementation Requirements
+
+### Frontend
+- UI composition:
+  - Use a responsive layout with a left rail for navigation of sections and a main content area for editors and charts.
+  - Inline editors: rich text or markdown editor with autosave; preserve formatting; support undo/redo within the session.
+  - Ensure all editor data is validated and saved as snapshots via API calls.
+- State management:
+  - Use React with proper typing (TypeScript) and React hooks.
+  - useState for arrays/objects initialized to proper defaults: e.g., useState<Snapshot[]>([]), useState<ReportSection[]>([]).
+  - Guard all array operations: const sections = Array.isArray(report?.sections) ? report.sections : [].
+- Caching integration:
+  - Read from cache before making heavy AI calls; update cache after AI responses.
+- Accessibility:
+  - ARIA attributes, semantic headings, keyboard shortcuts for common actions (save, export).
+- Data validation:
+  - Validate API responses: const dataArray = Array.isArray(response?.data) ? response.data : [].
+- Null-safety:
+  - All data fetch results should be guarded: (data ?? []).map(...) and optional chaining where needed.
+- Performance:
+  - Debounced autosave, batched updates, and lazy-loading of heavy charts.
+
+### Backend
+- Data models (Postgres/Supabase):
+  - Analysis: id, company_id, user_id, status, created_at, updated_at, depth_level, benchmark_enabled
+  - SectionContent: id, analysis_id, section_key, content, edited_at, author_id
+  - Snapshot: id, analysis_id, name, notes, created_at, content_snapshot (JSON)
+  - HealthScore: id, analysis_id, overall, financial, market, brand_social, benchmark_used (boolean)
+  - CacheEntry: id, key, value, expires_at
+  - PDFExportJob: id, analysis_id, status, progress, brandingOptions JSON, fileUrl, created_at, updated_at
+- APIs:
+  - GET /analyses/:id to fetch report structure and data
+  - POST /analyses/:id/sections/:sectionKey/edit to save inline edits
+  - POST /analyses/:id/snapshots to save a snapshot
+  - GET /analyses/:id/health to fetch health scores
+  - POST /analyses/:id/ai/generate to trigger AI analysis with depthLevel and benchmarks
+  - POST /analyses/:id/export/pdf to start PDF generation with branding options
+  - GET /exports/:exportId/status and /exports/:exportId/download
+  - Notification triggers in response to events
+- Validation:
+  - Validate all inputs server-side; ensure required fields exist; sanitize strings; ensure numeric values are numbers.
+- Security:
+  - Require authentication for all endpoints; verify authorization to access the analysis and company data.
+- Caching:
+  - Implement a cache layer for AI results, health scores, and frequently requested data with TTLs.
+
+### Integration
+- AI Analysis Engine:
+  - Orchestrates multi-prompt generation for each section: Executive Summary, SWOT, Financial, Market, Social, Risks, Opportunities, Action Plan.
+  - Supports depth levels and optional benchmarking data.
+  - Returns structured payload: { executiveSummary, swot, financialAnalysis, marketAnalysis, socialAnalysis, risks, opportunities, actionPlan, depthLevel }.
+- Health Scoring Engine:
+  - Compute overall health using weighted rules: financial 40%, market 30%, brand/social 30% (weights configurable).
+  - Optional benchmarking against industry norms if enabled; store benchmark flags and scores.
+- PDF Export:
+  - Server-side rendering using the HTML/CSS template; apply branding (logo, colors) and layout options.
+  - Implement a queuing system to handle large exports (e.g., job queue with worker processes).
+  - Return a downloadable URL upon completion.
+- Notifications:
+  - In-app notifications and transactional emails for: analysis complete, export ready, failed jobs, billing events, admin alerts.
+  - Use a unified event bus; ensure idempotent notification creation.
+- Export Settings:
+  - Provide branding options (logo URL or upload, color palette), include/exclude sections, page orientation (portrait/landscape), format (PDF/HTML), and file naming conventions.
+
+---
+
+## User Experience Flow
+1. User logs in and navigates to a specific company/analysis.
+2. User triggers AI analysis (if not already generated) or loads an existing analysis.
+3. Report Viewer renders sections with AI-generated content; user can:
+   - Edit text blocks inline and save snapshots.
+   - View health scores and quick KPI visualizations.
+   - See computed risks, opportunities, and prioritized actions.
+4. User can save snapshots of their refinements for versioning.
+5. User clicks Export to PDF, adjusts branding/options in Export Settings, and starts the export.
+6. Server processes the export (queued if needed); user receives a notification when ready and receives a download link.
+7. User may share a link or enable a viewer permission for stakeholders.
+8. System surfaces notifications for completed analyses, export completions, or any processing failures.
+
+---
+
+## Build Order & Dependencies (Mandatory)
+- Prerequisites:
+  - User authentication and authorization system in place.
+  - Core data models for Company, Analysis, and User profiles.
+  - Basic analytics/dashboard infrastructure (to ensure pages exist).
+- Blocks:
+  - Block 1: AI Analysis Engine and Health Scoring Engine foundations.
+  - Block 2: Caching Layer integration and data access patterns.
+  - Block 3: Report Editor components and Snapshot mechanism.
+  - Block 4: PDF Export pipeline with server-side rendering and queuing.
+  - Block 5: Notifications & In-app inbox integration.
+  - Block 6: Export Settings UI and PDF template integration.
+- Sequencing Rule:
+  - Authentication and core data setup must be completed before dashboard/workspace/analytics pages when both exist.
+  - Implement caching and health scoring before rendering the full Report Viewer to ensure snappy UX.
+
+---
+
+## Technical Specifications
+
+### Data Models
+- Analysis
+  - id (UUID)
+  - company_id (UUID)
+  - user_id (UUID)
+  - status (enum: ‘idle’ | ‘generating’ | ‘completed’ | ‘exporting’ | ‘failed’)
+  - depth_level (int)
+  - benchmark_enabled (boolean)
+  - created_at, updated_at
+- SectionContent
+  - id (UUID)
+  - analysis_id (UUID)
+  - section_key (string) // e.g., executive_summary, swot, financial_analysis, etc.
+  - content (text)
+  - edited_at (timestamp)
+  - author_id (UUID)
+- Snapshot
+  - id (UUID)
+  - analysis_id (UUID)
+  - name (string)
+  - notes (string)
+  - created_at
+  - content_snapshot (JSON) // includes the current sections’ content
+- HealthScore
+  - id (UUID)
+  - analysis_id (UUID)
+  - overall (float)
+  - financial (float)
+  - market (float)
+  - brand_social (float)
+  - benchmark_used (boolean)
+- PDFExportJob
+  - id (UUID)
+  - analysis_id (UUID)
+  - status (enum: ‘queued’ | ‘in_progress’ | ‘completed’ | ‘failed’)
+  - progress (float)
+  - brandingOptions JSON
+  - fileUrl string
+  - created_at, updated_at
+
+### API Endpoints
+- GET /analyses/:id
+- POST /analyses/:id/sections/:sectionKey/edit
+- POST /analyses/:id/snapshots
+- GET /analyses/:id/health
+- POST /analyses/:id/ai/generate
+- POST /analyses/:id/export/pdf
+- GET /exports/:exportId/status
+- GET /exports/:exportId/download
+- Notification endpoints (subscribe/publish as needed)
+
+### Security
+- Ensure authentication (JWT/session) and authorization checks per user-company-analysis.
+- Validate all inputs; sanitize strings; enforce rate limits on AI generation endpoints.
+- Use principle of least privilege for data access.
+
+### Validation
+- Response shapes must be validated: const sections = Array.isArray(response?.sections) ? response.sections : [].
+- For array-based data, guard all map/filter/reduce usages: (sections ?? []).map(...)
+- Optional chaining for deeply nested API responses: data?.sections?.[0]?.content
+
+---
+
+## Acceptance Criteria
+- [ ] The Report Viewer renders all sections with AI-generated content and supports inline edits with autosave and snapshot creation.
+- [ ] Health Score Engine computes overall and sub-scores with correct weighting and optional benchmarking; results persist.
+- [ ] AI Analysis Engine returns structured payloads for all sections with support for depth levels and optional benchmarks.
+- [ ] PDF Export pipeline starts, processes in a queue if necessary, applies branding, and provides a downloadable URL; status updates are reflected in UI and notifications.
+- [ ] Caching layer reduces API latency for repeated fetches within a session; invalidation occurs on edits/snapshots.
+- [ ] Notifications system delivers in-app and email notifications for analysis completion, export readiness, and errors.
+- [ ] All code adheres to the runtime safety rules: nullish coalescing for Supabase results, guarded array operations, proper useState defaults, validated API responses, optional chaining, and safe destructuring defaults.
+
+---
+
+## UI/UX Guidelines
+- Maintain consistency with the design system: typography scales, color tokens, spacing, and component variants.
+- Ensure responsive behavior for desktop and mobile; editors remain usable on smaller viewports.
+- Provide clear affordances for saving, snapshots, and exporting.
+- Display progress indicators during AI generation and export operations.
+- Accessibility: keyboard navigable, screen-reader friendly labeling, and contrasting colors for readability.
+
+---
+
+## Mandatory Coding Standards — Runtime Safety
+
+CRITICAL: Follow these rules in ALL generated code to prevent runtime crashes.
+
+1) Supabase query results:
+   - Always use nullish coalescing — const items = data ?? [].
+   - Example: const analyses = (data?.analyses ?? []) as Analysis[];
+
+2) Array methods:
+   - Guard before invoking: (items ?? []).map(...) or Array.isArray(items) ? items.map(...) : [].
+
+3) React useState for arrays/objects:
+   - Initialize properly: const [sections, setSections] = useState<SectionContent[]>([]);
+
+4) API response shapes:
+   - Validate: const list = Array.isArray(response?.data) ? response.data : [];
+
+5) Optional chaining:
+   - Use obj?.property?.nested when accessing nested API results.
+
+6) Destructuring with defaults:
+   - const { sections = [], health = 0 } = response ?? {};
+
+---
+
+## Example Data Flows (High-Level)
+
+- When the user edits a section:
+  - Frontend calls POST /analyses/:id/sections/:sectionKey/edit with { content }.
+  - Server validates, updates SectionContent, and returns updated content.
+  - Frontend updates local state and pushes a new Snapshot if requested.
+
+- When generating AI analysis:
+  - Frontend calls POST /analyses/:id/ai/generate with { depthLevel, benchmarks }.
+  - AIAnalysisEngine compiles prompts for each section, calls AI model(s), returns structured payload.
+  - Server caches results; frontend renders sections and updates health scores.
+
+- When exporting PDF:
+  - Frontend calls POST /analyses/:id/export/pdf with branding options.
+  - PDFExportService enqueues job if needed; returns exportId.
+  - Client polls GET /exports/:exportId/status; on completion, GET /exports/:exportId/download.
+
+- Health scoring:
+  - On analysis completion or on-demand, GET /analyses/:id/health computes and returns overall and sub-scores. UI displays HealthScorePanel.
+
+---
+
+This prompt is designed to be fed into an AI development tooling environment to drive a full-stack implementation for the Report Viewer feature set, ensuring robust runtime safety, clear build order, and comprehensive integration of caching, health scoring, AI orchestration, export, and notification systems. for style.
+
+CRITICAL DESIGN REQUIREMENTS:
+- You MUST follow ALL design principles and patterns specified in the Design Reference above
+- Do NOT deviate from the design specifications without explicit user permission
+- Implement ALL visual design elements (colors, typography, spacing, shadows, animations) as specified
+- Follow the layout patterns and component designs exactly as documented
+- Ensure all interactions and micro-animations match the reference specifications
+
+CRITICAL TECHNICAL REQUIREMENTS:
+- React 18.3.1, React Router 6.30.1
+- Tailwind CSS v3 with tailwind.config.js and custom keyframes
+- @tailwindcss/typography plugin for rich text content
+- Tailwind CSS animations (NOT Motion library or framer-motion)
+- Sonner for toasts
+- Recharts for data visualization
+- Native fetch() with API utilities in src/lib/api.ts
+- Design system with CSS custom properties
+- Use RGB color values for theming
+- When Supabase is configured: use Edge Functions for LLM and server-only logic; never expose API keys in the client
+
+
+=== EDGE FUNCTIONS & DATABASE MIGRATIONS (MANDATORY) ===
+
+Even without a Supabase project connected, you MUST create the correct files when the task requires them:
+
+EDGE FUNCTIONS - create supabase/functions/<function-name>/index.ts for:
+- LLM/AI features (chat, completions, embeddings, vector search)
+- Third-party API integrations (Stripe, SendGrid, Twilio, OpenAI, Anthropic, etc.)
+- Incoming webhooks from external services
+- Any server-only logic or logic that must not expose secrets to the client
+- Any prompt that says "create edge function" or "add edge function"
+File location: supabase/functions/<function-name>/index.ts
+Import pattern: import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+Never expose API keys or secrets in client-side code.
+
+DATABASE MIGRATIONS - create supabase/migrations/<YYYYMMDDHHmmss>_<description>.sql for:
+- Every new database table, view, or enum mentioned in the task
+- Every schema change (ALTER TABLE, new index, new policy, etc.)
+- Any prompt that says "create migration" or describes a data model
+Make migrations idempotent (IF NOT EXISTS / CREATE OR REPLACE). Include RLS policies.
+Do NOT run "supabase db push" or execute SQL directly — only create the .sql files.
+
+MANDATORY CHECKLIST - Before finishing, verify:
+- [ ] Migration SQL file(s) created for every database table/schema change mentioned
+- [ ] Edge Function file(s) created for every server-side/secrets feature mentioned
+- [ ] TypeScript types created for every new database table
+
+=== TASK ===
+# Report Viewer
+
+## Overview
+You will build a feature-complete, scalable Report Viewer for PulseBoard — a single-analysis AI-generated report with editable text blocks, snapshots, and rich data integration. The system includes caching, health scoring, AI orchestration, export/PDF generation, notifications, and an export settings workflow. All code must be resilient to null/undefined values and guard against typical runtime pitfalls (per the Runtime Safety rules below). Implement authentication and core data setup before dashboard/workspace/analytics tasks when both are present.
+
+---
+
+## Page Description (Full Detail)
+What this page is:
+- The Report Viewer page renders a full AI-generated report for a single company analysis, including: executive summary, SWOT, financial analysis, market analysis, social analysis, top risks, opportunities, and a prioritized action plan.
+- The page supports inline edits to AI-generated text blocks, saving snapshots of user refinements, and exporting the report as a branded PDF. It also provides a shareable/export-ready link.
+
+Goals:
+- Deliver a human-readable, AI-driven, deeply structured report with editable blocks and persistent snapshots.
+- Seamlessly integrate with caching, health scoring, AI analysis engine, export pipeline, and notification systems.
+- Provide a clean, responsive UI with sections, charts, in-place editing, progress indicators, and action-oriented controls (save, export, share, snapshot management).
+
+Connected features:
+- Caching & Performance: Cache computed results, external integration responses, and frequently used data to reduce latency and API costs.
+- Health Scoring Engine: Compute overall company health and sub-scores (financial, market, brand/social) using weighted rules and optional benchmarking against industry norms.
+- Report Export / PDF Generation: Server-side PDF generation with branding options and queued processing for large exports.
+- AI Analysis Engine: Orchestrates AI prompts to generate executive summary, SWOT, financial/market/social analysis, risks, opportunities, and prioritized action plan. Supports depth levels and optional benchmarks.
+- Notifications & Emails: Transactional and in-app notifications for completed analyses, export ready, failed jobs, billing, and admin alerts. Uses an email provider and in-app inbox.
+
+UI elements and guidance:
+- Report header: Title, Company name, Analysis date, Share/export buttons, status badge (draft/completed).
+- Editable blocks: Inline text editors for each major section (Executive Summary, SWOT, Financial Analysis, Market Analysis, Social Analysis, Risks, Opportunities, Action Plan).
+- Visual components: Section dividers, chart placeholders (fin/market/social), health score meters, and a compact KPI strip.
+- Snapshots: Optional saved states of edits with timestamp, author, and notes.
+- Export controls: PDF/HTML export button, branding options, page orientation, include/exclude sections, file format, and an export progress indicator with a final download link.
+- Notifications: In-app inbox area and a top-right notifications bell.
+- Design system: Follow the project’s design system for typography, spacing, colors, and components. Ensure accessibility (ARIA labels, keyboard navigation).
+
+API integrations:
+- No external APIs are required for this page (per PROJECT CONTEXT). All data can be simulated or stored in Supabase/Postgres as part of your data layer. The AI prompts are orchestrated via the AI Analysis Engine module (internal orchestration).
+
+Asset:
+- [asset] Report PDF Template: HTML/CSS template for rendering the PDF with branding and white-label options. Used by the server-side PDF generator.
+
+Connected Page:
+- [page] Export / PDF Settings: UI to customize what goes into the PDF, branding, orientation, and export options, plus export progress and download link.
+
+---
+
+## Components to Build
+- ReportViewerPage
+  - Props: analysisId, companyId, userId
+  - State: reportData, isLoading, isExporting, editDrafts, snapshots, healthScores
+  - Subcomponents:
+    - SectionEditor (reusable inline editor with autosave)
+    - HealthScorePanel (overall score + sub-scores)
+    - KPIChart (Financial, Market, Brand/Social visualizations)
+    - SnapshotManager (save, list, restore, annotate)
+    - ExportPanel (branding options, page orientation, format, status)
+    - PDFPreviewPlaceholder (link to generated PDF)
+    - NotificationToast/InAppInbox access
+- CacheLayer
+  - Functions to cache results, external responses, and frequently used data
+- HealthScoringEngine
+  - Compute overall health and sub-scores with weighted rules and optional benchmarking
+- AIAnalysisEngine
+  - Orchestrates prompts for each section; accepts depth level and optional benchmarks
+- PDFExportService
+  - Server-side generation, queueing, branding, and delivery
+- NotificationsModule
+  - In-app and email notifications for events
+- ReportPdfTemplate
+  - HTML/CSS template used by PDF generator
+- SettingsPanel (Export / PDF Settings)
+  - UI to include/exclude sections, branding, orientation, format
+
+---
+
+## Implementation Requirements
+
+### Frontend
+- UI composition:
+  - Use a responsive layout with a left rail for navigation of sections and a main content area for editors and charts.
+  - Inline editors: rich text or markdown editor with autosave; preserve formatting; support undo/redo within the session.
+  - Ensure all editor data is validated and saved as snapshots via API calls.
+- State management:
+  - Use React with proper typing (TypeScript) and React hooks.
+  - useState for arrays/objects initialized to proper defaults: e.g., useState<Snapshot[]>([]), useState<ReportSection[]>([]).
+  - Guard all array operations: const sections = Array.isArray(report?.sections) ? report.sections : [].
+- Caching integration:
+  - Read from cache before making heavy AI calls; update cache after AI responses.
+- Accessibility:
+  - ARIA attributes, semantic headings, keyboard shortcuts for common actions (save, export).
+- Data validation:
+  - Validate API responses: const dataArray = Array.isArray(response?.data) ? response.data : [].
+- Null-safety:
+  - All data fetch results should be guarded: (data ?? []).map(...) and optional chaining where needed.
+- Performance:
+  - Debounced autosave, batched updates, and lazy-loading of heavy charts.
+
+### Backend
+- Data models (Postgres/Supabase):
+  - Analysis: id, company_id, user_id, status, created_at, updated_at, depth_level, benchmark_enabled
+  - SectionContent: id, analysis_id, section_key, content, edited_at, author_id
+  - Snapshot: id, analysis_id, name, notes, created_at, content_snapshot (JSON)
+  - HealthScore: id, analysis_id, overall, financial, market, brand_social, benchmark_used (boolean)
+  - CacheEntry: id, key, value, expires_at
+  - PDFExportJob: id, analysis_id, status, progress, brandingOptions JSON, fileUrl, created_at, updated_at
+- APIs:
+  - GET /analyses/:id to fetch report structure and data
+  - POST /analyses/:id/sections/:sectionKey/edit to save inline edits
+  - POST /analyses/:id/snapshots to save a snapshot
+  - GET /analyses/:id/health to fetch health scores
+  - POST /analyses/:id/ai/generate to trigger AI analysis with depthLevel and benchmarks
+  - POST /analyses/:id/export/pdf to start PDF generation with branding options
+  - GET /exports/:exportId/status and /exports/:exportId/download
+  - Notification triggers in response to events
+- Validation:
+  - Validate all inputs server-side; ensure required fields exist; sanitize strings; ensure numeric values are numbers.
+- Security:
+  - Require authentication for all endpoints; verify authorization to access the analysis and company data.
+- Caching:
+  - Implement a cache layer for AI results, health scores, and frequently requested data with TTLs.
+
+### Integration
+- AI Analysis Engine:
+  - Orchestrates multi-prompt generation for each section: Executive Summary, SWOT, Financial, Market, Social, Risks, Opportunities, Action Plan.
+  - Supports depth levels and optional benchmarking data.
+  - Returns structured payload: { executiveSummary, swot, financialAnalysis, marketAnalysis, socialAnalysis, risks, opportunities, actionPlan, depthLevel }.
+- Health Scoring Engine:
+  - Compute overall health using weighted rules: financial 40%, market 30%, brand/social 30% (weights configurable).
+  - Optional benchmarking against industry norms if enabled; store benchmark flags and scores.
+- PDF Export:
+  - Server-side rendering using the HTML/CSS template; apply branding (logo, colors) and layout options.
+  - Implement a queuing system to handle large exports (e.g., job queue with worker processes).
+  - Return a downloadable URL upon completion.
+- Notifications:
+  - In-app notifications and transactional emails for: analysis complete, export ready, failed jobs, billing events, admin alerts.
+  - Use a unified event bus; ensure idempotent notification creation.
+- Export Settings:
+  - Provide branding options (logo URL or upload, color palette), include/exclude sections, page orientation (portrait/landscape), format (PDF/HTML), and file naming conventions.
+
+---
+
+## User Experience Flow
+1. User logs in and navigates to a specific company/analysis.
+2. User triggers AI analysis (if not already generated) or loads an existing analysis.
+3. Report Viewer renders sections with AI-generated content; user can:
+   - Edit text blocks inline and save snapshots.
+   - View health scores and quick KPI visualizations.
+   - See computed risks, opportunities, and prioritized actions.
+4. User can save snapshots of their refinements for versioning.
+5. User clicks Export to PDF, adjusts branding/options in Export Settings, and starts the export.
+6. Server processes the export (queued if needed); user receives a notification when ready and receives a download link.
+7. User may share a link or enable a viewer permission for stakeholders.
+8. System surfaces notifications for completed analyses, export completions, or any processing failures.
+
+---
+
+## Build Order & Dependencies (Mandatory)
+- Prerequisites:
+  - User authentication and authorization system in place.
+  - Core data models for Company, Analysis, and User profiles.
+  - Basic analytics/dashboard infrastructure (to ensure pages exist).
+- Blocks:
+  - Block 1: AI Analysis Engine and Health Scoring Engine foundations.
+  - Block 2: Caching Layer integration and data access patterns.
+  - Block 3: Report Editor components and Snapshot mechanism.
+  - Block 4: PDF Export pipeline with server-side rendering and queuing.
+  - Block 5: Notifications & In-app inbox integration.
+  - Block 6: Export Settings UI and PDF template integration.
+- Sequencing Rule:
+  - Authentication and core data setup must be completed before dashboard/workspace/analytics pages when both exist.
+  - Implement caching and health scoring before rendering the full Report Viewer to ensure snappy UX.
+
+---
+
+## Technical Specifications
+
+### Data Models
+- Analysis
+  - id (UUID)
+  - company_id (UUID)
+  - user_id (UUID)
+  - status (enum: ‘idle’ | ‘generating’ | ‘completed’ | ‘exporting’ | ‘failed’)
+  - depth_level (int)
+  - benchmark_enabled (boolean)
+  - created_at, updated_at
+- SectionContent
+  - id (UUID)
+  - analysis_id (UUID)
+  - section_key (string) // e.g., executive_summary, swot, financial_analysis, etc.
+  - content (text)
+  - edited_at (timestamp)
+  - author_id (UUID)
+- Snapshot
+  - id (UUID)
+  - analysis_id (UUID)
+  - name (string)
+  - notes (string)
+  - created_at
+  - content_snapshot (JSON) // includes the current sections’ content
+- HealthScore
+  - id (UUID)
+  - analysis_id (UUID)
+  - overall (float)
+  - financial (float)
+  - market (float)
+  - brand_social (float)
+  - benchmark_used (boolean)
+- PDFExportJob
+  - id (UUID)
+  - analysis_id (UUID)
+  - status (enum: ‘queued’ | ‘in_progress’ | ‘completed’ | ‘failed’)
+  - progress (float)
+  - brandingOptions JSON
+  - fileUrl string
+  - created_at, updated_at
+
+### API Endpoints
+- GET /analyses/:id
+- POST /analyses/:id/sections/:sectionKey/edit
+- POST /analyses/:id/snapshots
+- GET /analyses/:id/health
+- POST /analyses/:id/ai/generate
+- POST /analyses/:id/export/pdf
+- GET /exports/:exportId/status
+- GET /exports/:exportId/download
+- Notification endpoints (subscribe/publish as needed)
+
+### Security
+- Ensure authentication (JWT/session) and authorization checks per user-company-analysis.
+- Validate all inputs; sanitize strings; enforce rate limits on AI generation endpoints.
+- Use principle of least privilege for data access.
+
+### Validation
+- Response shapes must be validated: const sections = Array.isArray(response?.sections) ? response.sections : [].
+- For array-based data, guard all map/filter/reduce usages: (sections ?? []).map(...)
+- Optional chaining for deeply nested API responses: data?.sections?.[0]?.content
+
+---
+
+## Acceptance Criteria
+- [ ] The Report Viewer renders all sections with AI-generated content and supports inline edits with autosave and snapshot creation.
+- [ ] Health Score Engine computes overall and sub-scores with correct weighting and optional benchmarking; results persist.
+- [ ] AI Analysis Engine returns structured payloads for all sections with support for depth levels and optional benchmarks.
+- [ ] PDF Export pipeline starts, processes in a queue if necessary, applies branding, and provides a downloadable URL; status updates are reflected in UI and notifications.
+- [ ] Caching layer reduces API latency for repeated fetches within a session; invalidation occurs on edits/snapshots.
+- [ ] Notifications system delivers in-app and email notifications for analysis completion, export readiness, and errors.
+- [ ] All code adheres to the runtime safety rules: nullish coalescing for Supabase results, guarded array operations, proper useState defaults, validated API responses, optional chaining, and safe destructuring defaults.
+
+---
+
+## UI/UX Guidelines
+- Maintain consistency with the design system: typography scales, color tokens, spacing, and component variants.
+- Ensure responsive behavior for desktop and mobile; editors remain usable on smaller viewports.
+- Provide clear affordances for saving, snapshots, and exporting.
+- Display progress indicators during AI generation and export operations.
+- Accessibility: keyboard navigable, screen-reader friendly labeling, and contrasting colors for readability.
+
+---
+
+## Mandatory Coding Standards — Runtime Safety
+
+CRITICAL: Follow these rules in ALL generated code to prevent runtime crashes.
+
+1) Supabase query results:
+   - Always use nullish coalescing — const items = data ?? [].
+   - Example: const analyses = (data?.analyses ?? []) as Analysis[];
+
+2) Array methods:
+   - Guard before invoking: (items ?? []).map(...) or Array.isArray(items) ? items.map(...) : [].
+
+3) React useState for arrays/objects:
+   - Initialize properly: const [sections, setSections] = useState<SectionContent[]>([]);
+
+4) API response shapes:
+   - Validate: const list = Array.isArray(response?.data) ? response.data : [];
+
+5) Optional chaining:
+   - Use obj?.property?.nested when accessing nested API results.
+
+6) Destructuring with defaults:
+   - const { sections = [], health = 0 } = response ?? {};
+
+---
+
+## Example Data Flows (High-Level)
+
+- When the user edits a section:
+  - Frontend calls POST /analyses/:id/sections/:sectionKey/edit with { content }.
+  - Server validates, updates SectionContent, and returns updated content.
+  - Frontend updates local state and pushes a new Snapshot if requested.
+
+- When generating AI analysis:
+  - Frontend calls POST /analyses/:id/ai/generate with { depthLevel, benchmarks }.
+  - AIAnalysisEngine compiles prompts for each section, calls AI model(s), returns structured payload.
+  - Server caches results; frontend renders sections and updates health scores.
+
+- When exporting PDF:
+  - Frontend calls POST /analyses/:id/export/pdf with branding options.
+  - PDFExportService enqueues job if needed; returns exportId.
+  - Client polls GET /exports/:exportId/status; on completion, GET /exports/:exportId/download.
+
+- Health scoring:
+  - On analysis completion or on-demand, GET /analyses/:id/health computes and returns overall and sub-scores. UI displays HealthScorePanel.
+
+---
+
+This prompt is designed to be fed into an AI development tooling environment to drive a full-stack implementation for the Report Viewer feature set, ensuring robust runtime safety, clear build order, and comprehensive integration of caching, health scoring, AI orchestration, export, and notification systems.
+
+=== SUCCESS CRITERIA ===
+# Success Criteria Checklist
+
+## Code Quality
+
+### TypeScript
+- [ ] No TypeScript errors (`tsc --noEmit` passes)
+- [ ] All functions and components have proper type definitions
+- [ ] No `any` types used (use `unknown` if type is truly unknown)
+- [ ] Props interfaces defined for all components
+- [ ] API responses have type definitions
+
+### Code Standards
+- [ ] All imports use path aliases (@/ prefix)
+- [ ] Components follow the established naming convention
+- [ ] Files are organized in correct directories
+- [ ] No unused imports or variables
+- [ ] Consistent code formatting
+
+## Component Implementation
+
+### UI Components
+- [ ] Use shadcn/ui components (Button, Card, Input, etc.) instead of building from scratch
+- [ ] All interactive elements have hover states
+- [ ] Components use the `cn()` utility for class merging
+- [ ] Proper TypeScript props interfaces defined
+- [ ] Components are responsive (mobile, tablet, desktop)
+
+### Animations
+- [ ] Motion library used for all animations (NOT framer-motion)
+- [ ] Page transitions implemented with fade/slide
+- [ ] Interactive elements have whileHover/whileTap animations
+- [ ] List items use stagger animations where appropriate
+- [ ] Animations respect `prefers-reduced-motion`
+
+### Icons
+- [ ] Lucide React icons used consistently
+- [ ] Icons have consistent sizing (h-4 w-4, h-5 w-5, h-6 w-6)
+- [ ] Icon colors match design system (text-primary, text-muted-foreground)
+
+## Data Management
+
+### React Query
+- [ ] All data fetching uses React Query hooks
+- [ ] Query keys follow the established pattern
+- [ ] Mutations invalidate related queries
+- [ ] Loading and error states handled
+- [ ] Optimistic updates implemented where appropriate
+
+### Forms
+- [ ] Forms use react-hook-form
+- [ ] Validation uses Zod schemas
+- [ ] Error messages display properly
+- [ ] Form submission shows loading state
+- [ ] Success/error feedback via toast notifications
+
+### API Layer
+- [ ] API functions in src/api/ directory
+- [ ] Axios used for HTTP requests
+- [ ] Proper error handling with try/catch
+- [ ] Auth tokens handled by interceptors
+- [ ] Type-safe API function signatures
+
+## User Experience
+
+### Notifications
+- [ ] Sonner toasts used for all notifications
+- [ ] Success actions show success toast
+- [ ] Errors show descriptive error messages
+- [ ] Loading states show toast.loading()
+
+### Loading States
+- [ ] Skeleton loaders shown during data fetch
+- [ ] Buttons show loading state during submission
+- [ ] Disabled state applied during async operations
+
+### Error Handling
+- [ ] Network errors caught and displayed
+- [ ] User-friendly error messages (no stack traces)
+- [ ] Fallback UI for error states
+- [ ] No unhandled promise rejections
+
+## Navigation
+
+### Route Accessibility
+- [ ] All pages have routes defined in router configuration
+- [ ] Every page is accessible through navigation (menu, sidebar, or direct URL)
+- [ ] Main pages (Dashboard, Home, Settings, etc.) accessible from primary navigation
+- [ ] Secondary pages accessible through contextual navigation or direct links
+- [ ] Deep-linked pages have breadcrumbs or back navigation
+- [ ] 404/Not Found page implemented for invalid routes
+- [ ] Protected routes have proper authentication checks
+- [ ] Navigation state persists across page refreshes where appropriate
+
+### Navigation UX
+- [ ] Active route highlighted in navigation menu
+- [ ] Clear visual hierarchy in navigation structure
+- [ ] Mobile navigation is accessible and usable
+- [ ] Navigation items have hover/focus states
+- [ ] Nested routes show parent-child relationships
+- [ ] User can always return to main areas (Dashboard/Home)
+
+## Styling
+
+### Tailwind CSS
+- [ ] Tailwind v3 classes used
+- [ ] HSL color variables from design system
+- [ ] Custom CSS properties used where defined
+- [ ] Responsive breakpoints: mobile-first approach
+- [ ] Dark mode support via CSS variables
+
+### Design System
+- [ ] Colors use theme variables (primary, secondary, accent)
+- [ ] Spacing uses Tailwind scale (p-4, gap-6, etc.)
+- [ ] Border radius uses theme values (rounded-lg)
+- [ ] Shadows use theme values (shadow-card)
+- [ ] Typography follows Inter font system
+
+## Accessibility
+
+- [ ] Semantic HTML elements used
+- [ ] Buttons have descriptive labels
+- [ ] Forms have proper labels
+- [ ] Focus states visible on interactive elements
+- [ ] Color contrast meets WCAG standards
+
+## Performance
+
+- [ ] No console.log statements in production code
+- [ ] No console errors in browser
+- [ ] Images optimized (WebP, lazy loading)
+- [ ] Large lists use virtualization if needed
+- [ ] React Query cache configured appropriately
+
+## Testing Readiness
+
+- [ ] Components structured for easy testing
+- [ ] Business logic separated from presentation
+- [ ] Mock-friendly API layer
+- [ ] No hardcoded values that should be configurable
+- [ ] Environment variables properly configured
+
+## Final Checks
+
+- [ ] Code builds without errors (`npm run build`)
+- [ ] Development server runs without errors (`npm run dev`)
+- [ ] No TypeScript errors in editor
+- [ ] Browser console is clean (no errors or warnings)
+- [ ] All functionality works as expected
+- [ ] Code follows existing project patterns
+- [ ] Changes are consistent with the rest of the codebase
+
+
+
+IMPORTANT: ALL styling and design decisions must follow the Design Reference section above EXACTLY. Do not make arbitrary design choices.
+
+Analyze the existing project structure and implement the task following the patterns already established. Ensure all success criteria are met.
