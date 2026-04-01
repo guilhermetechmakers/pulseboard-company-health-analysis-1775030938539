@@ -1,6 +1,7 @@
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { BarChart3, FileDown, FileSpreadsheet, Plug, Sparkles } from 'lucide-react'
-import { differenceInHours, parseISO } from 'date-fns'
+import { differenceInHours, format, parseISO } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -24,6 +25,7 @@ import { useVerificationResend } from '@/hooks/use-verification-resend'
 import { buildCompletenessSlices, completenessPercent, healthSubscores } from '@/lib/dashboard-utils'
 import { asRecord, pickNumber } from '@/lib/safe-data'
 import { cn } from '@/lib/utils'
+import { useCompanyHealthScores, useComputeHealthScore } from '@/hooks/use-health-scores'
 
 export function DashboardPage() {
   const { user, isEmailVerified } = useAuth()
@@ -33,8 +35,27 @@ export function DashboardPage() {
   const { data: integrations = [], isLoading: intLoading } = useIntegrations(companyId)
   const { data: jobs, isLoading: jobsLoading } = useSyncJobs(companyId)
   const { data: agg, isLoading: aggLoading } = useCompanyAggregates(companyId)
+  const { data: healthHistory = [] } = useCompanyHealthScores(companyId ?? null, 16)
+  const computeHealth = useComputeHealthScore()
 
   const loading = companyLoading || intLoading || aggLoading
+
+  const overallHistoryPoints = useMemo(() => {
+    const rows = Array.isArray(healthHistory) ? [...healthHistory] : []
+    const chronological = rows.reverse()
+    return chronological.map((r) => {
+      let label = ''
+      try {
+        label = format(parseISO(r.scored_at), 'MMM d')
+      } catch {
+        label = r.scored_at.slice(5, 10)
+      }
+      return {
+        label,
+        score: typeof r.overall === 'number' && Number.isFinite(r.overall) ? r.overall : 0,
+      }
+    })
+  }, [healthHistory])
 
   const slices = buildCompletenessSlices(
     company,
@@ -104,6 +125,15 @@ export function DashboardPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            className="gap-2"
+            disabled={!companyId || computeHealth.isPending}
+            onClick={() => companyId && void computeHealth.mutateAsync({ companyId })}
+          >
+            Refresh score (rules)
+          </Button>
           <Button asChild variant="primary" className="gap-2 transition-all duration-200 hover:scale-[1.02]">
             <Link to="/generate">
               <Sparkles className="h-4 w-4" />
@@ -207,7 +237,35 @@ export function DashboardPage() {
         </Card>
       </div>
 
-      <HealthTrendChart data={chartData.length > 0 ? chartData : undefined} />
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <HealthTrendChart
+            data={chartData.length > 0 ? chartData : undefined}
+            overallHistory={overallHistoryPoints.length > 1 ? overallHistoryPoints : undefined}
+          />
+        </div>
+        <Card className="border-border/80 p-6 shadow-card">
+          <h2 className="mb-2 text-lg font-semibold tracking-tight">Complete your data</h2>
+          <p className="mb-4 text-sm text-muted-foreground">Address gaps to improve score quality and AI output.</p>
+          <ul className="space-y-2 text-sm" aria-label="Incomplete data categories">
+            {slices
+              .filter((s) => !s.done)
+              .map((s) => (
+                <li key={s.key}>
+                  <Link
+                    to={s.href}
+                    className="font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {s.label}
+                  </Link>
+                </li>
+              ))}
+            {slices.every((s) => s.done) ? (
+              <li className="text-muted-foreground">All guided slices satisfied. Nice work.</li>
+            ) : null}
+          </ul>
+        </Card>
+      </div>
 
       <DashboardNotificationsPanel />
 

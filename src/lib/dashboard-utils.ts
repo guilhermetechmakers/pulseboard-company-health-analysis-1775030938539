@@ -58,12 +58,15 @@ export function completenessPercent(slices: CompletenessSlice[]): number {
 
 export function healthSubscores(healthScores: unknown): { label: string; value: number }[] {
   const r = asRecord(healthScores)
-  const keys = ['financial', 'market', 'brand', 'overall'] as const
-  return keys.map((k) => {
-    const raw = r[k]
+  const brandRaw = r.brand ?? r.social
+  const entries: { label: string; raw: unknown }[] = [
+    { label: 'Financial', raw: r.financial },
+    { label: 'Market', raw: r.market },
+    { label: 'Brand / social', raw: brandRaw },
+    { label: 'Overall', raw: r.overall },
+  ]
+  return entries.map(({ label, raw }) => {
     const num = typeof raw === 'number' ? raw : Number(raw)
-    const label =
-      k === 'brand' ? 'Brand / social' : k === 'overall' ? 'Overall' : k.charAt(0).toUpperCase() + k.slice(1)
     return {
       label,
       value: Number.isFinite(num) ? Math.min(100, Math.max(0, num)) : 0,

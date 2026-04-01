@@ -8,6 +8,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from 'https://esm.sh/zod@3.23.8'
 import { corsHeaders } from '../_shared/cors.ts'
 import { asArray, asRecord } from '../_shared/safe-json.ts'
+import { computeWeightedHealthScores, mergeLlmAndRuleScores } from '../_shared/health-score-engine.ts'
 import { createUserNotification } from '../_shared/pulse-notify.ts'
 import { sendTemplatedEmailIfEnabled } from '../_shared/transactional-email.ts'
 
@@ -296,9 +297,20 @@ Rules:
 
       const companyRecord = asRecord(company as Record<string, unknown>)
       const priorScores = asRecord(companyRecord.health_scores)
+      const ruleScores = computeWeightedHealthScores({
+        company: companyRecord,
+        financials: finRes.data ? asRecord(finRes.data as Record<string, unknown>) : null,
+        market: marketRes.data ? asRecord(marketRes.data as Record<string, unknown>) : null,
+        social: socialRes.data ? asRecord(socialRes.data as Record<string, unknown>) : null,
+      })
+      const merged = mergeLlmAndRuleScores(parsed.healthScores, ruleScores)
       const healthScores = {
         ...priorScores,
-        ...parsed.healthScores,
+        overall: merged.overall,
+        financial: merged.financial,
+        market: merged.market,
+        brand: merged.brandSocial,
+        social: merged.brandSocial,
         lastAnalysisAt: consentIso,
         analysisDepth,
       }
@@ -327,7 +339,12 @@ Rules:
           risks: risksJson,
           opportunities: oppsJson,
           action_plan: actionsJson,
-          health_scores: parsed.healthScores,
+          health_scores: {
+            overall: merged.overall,
+            financial: merged.financial,
+            market: merged.market,
+            social: merged.brandSocial,
+          },
           payload,
           source_model: model,
           updated_at: new Date().toISOString(),
@@ -339,6 +356,21 @@ Rules:
       }
 
       await supabase.from('companies').update({ health_scores: healthScores, updated_at: new Date().toISOString() }).eq('id', companyId)
+
+      const { error: historyErr } = await supabase.from('company_health_scores').insert({
+        company_id: companyId,
+        report_id: reportId,
+        overall: merged.overall,
+        financial: merged.financial,
+        market: merged.market,
+        brand_social: merged.brandSocial,
+        benchmarks: benchmarking ? { enabled: true, analysisDepth } : {},
+        notes: null,
+        source: 'llm',
+      })
+      if (historyErr) {
+        console.error('company_health_scores insert:', historyErr.message)
+      }
 
       const companyName = typeof companyRecord.name === 'string' ? companyRecord.name : 'Your company'
       const displayName =

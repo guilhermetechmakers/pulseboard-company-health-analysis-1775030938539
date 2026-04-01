@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { PageTemplate } from '@/components/layout/page-template'
 import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ReportViewerEditorBlock } from '@/components/analysis/report-viewer-editor-block'
@@ -27,6 +29,17 @@ export function ReportViewerPage() {
   const { id, reportId: reportIdParam } = useParams()
   const reportId = id ?? reportIdParam
   const { data: report, isLoading, error } = useReport(reportId)
+  const companyId = report?.company_id
+  const { data: companyMeta } = useQuery({
+    queryKey: ['company-meta', companyId],
+    enabled: Boolean(supabase && companyId),
+    queryFn: async () => {
+      if (!supabase || !companyId) return null
+      const { data, error: qErr } = await supabase.from('companies').select('name, industry').eq('id', companyId).maybeSingle()
+      if (qErr) throw new Error(qErr.message)
+      return data
+    },
+  })
   const { data: snapshots } = useReportSnapshots(reportId)
   const updateReport = useUpdateReportSections()
   const createSnapshot = useCreateReportSnapshot()
@@ -94,11 +107,33 @@ export function ReportViewerPage() {
 
   const safeSnapshots = Array.isArray(snapshots) ? snapshots : []
 
+  const companyName = typeof companyMeta?.name === 'string' ? companyMeta.name : null
+  const companyIndustry = typeof companyMeta?.industry === 'string' ? companyMeta.industry : null
+
   return (
     <PageTemplate
       title="Report viewer"
-      description={`Analysis ${report.status} · ${report.analysis_depth ?? 'standard'} · ${new Date(report.created_at).toLocaleString()}`}
+      description={`${companyName ?? 'Company'}${companyIndustry ? ` · ${companyIndustry}` : ''} · Analysis ${report.status} · ${report.analysis_depth ?? 'standard'} · ${new Date(report.created_at).toLocaleString()}`}
     >
+      <Card className="mb-6 border-border/80 p-5 shadow-card no-print">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Report header</p>
+            <h2 className="mt-1 text-xl font-semibold tracking-tight">{companyName ?? 'Company report'}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Generated {new Date(report.created_at).toLocaleString()}
+              {report.analysis_depth ? ` · Depth: ${report.analysis_depth}` : ''}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline" className="capitalize">
+              {report.status}
+            </Badge>
+            {report.benchmarking_enabled ? <Badge variant="warning">Benchmarking</Badge> : null}
+          </div>
+        </div>
+      </Card>
+
       <div className="mb-6 flex flex-wrap gap-2 no-print">
         <Button
           type="button"

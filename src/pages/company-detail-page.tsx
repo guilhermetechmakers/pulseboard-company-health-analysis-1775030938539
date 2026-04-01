@@ -1,11 +1,17 @@
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SyncHistoryPanel } from '@/components/integrations/sync-history-panel'
+import { ProfileSummaryCard } from '@/components/company/profile-summary-card'
+import { HealthBreakdownPanel } from '@/components/company/health-breakdown-panel'
+import { AnalysisHistoryTimeline } from '@/components/company/analysis-history-timeline'
+import { SaveInputSnapshotPanel } from '@/components/company/save-input-snapshot-panel'
+import { CompanyWorkspaceForms } from '@/components/company/company-workspace-forms'
 import { useMyCompany } from '@/hooks/use-my-company'
 import { useCompanyReports } from '@/hooks/use-analysis'
 import { AnalysisHistoryList } from '@/components/analysis/analysis-history-list'
@@ -17,8 +23,19 @@ import {
   hasMarketSignals,
   hasSocialSignals,
 } from '@/hooks/use-company-aggregates'
+import { useCompanyHealthScores, useComputeHealthScore } from '@/hooks/use-health-scores'
 import { buildCompletenessSlices, completenessPercent, healthSubscores } from '@/lib/dashboard-utils'
 import { pickNumber, asRecord } from '@/lib/safe-data'
+import type { CompanyHealthScoreRow } from '@/types/health-score'
+
+function subScoreMap(scores: unknown): Record<string, number> {
+  const entries = healthSubscores(scores)
+  const m: Record<string, number> = {}
+  for (const e of entries) {
+    m[e.label] = e.value
+  }
+  return m
+}
 
 export function CompanyDetailPage() {
   const { data: company, isLoading } = useMyCompany()
@@ -27,29 +44,14 @@ export function CompanyDetailPage() {
   const { data: jobs, isLoading: jobsLoading } = useSyncJobs(companyId)
   const { data: agg, isLoading: aggLoading } = useCompanyAggregates(companyId)
   const { data: companyReports = [] } = useCompanyReports(companyId ?? null)
+  const { data: healthHistory = [], isLoading: healthLoading } = useCompanyHealthScores(companyId ?? null, 48)
+  const computeHealth = useComputeHealthScore()
+  const [selectedHealthId, setSelectedHealthId] = useState<string | null>(null)
 
-  if (isLoading) {
-    return (
-      <section className="space-y-6 animate-fade-in">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-48 w-full" />
-      </section>
-    )
-  }
-
-  if (!company) {
-    return (
-      <section className="space-y-6">
-        <h1 className="text-3xl font-semibold">Company workspace</h1>
-        <Card className="p-8 text-center">
-          <p className="text-muted-foreground">No company on file yet.</p>
-          <Button asChild className="mt-4">
-            <Link to="/company/create">Create company</Link>
-          </Button>
-        </Card>
-      </section>
-    )
-  }
+  const safeHistory = useMemo(
+    () => (Array.isArray(healthHistory) ? healthHistory : []) as CompanyHealthScoreRow[],
+    [healthHistory],
+  )
 
   const slices = buildCompletenessSlices(
     company,
@@ -59,64 +61,125 @@ export function CompanyDetailPage() {
     (integrations ?? []).filter((i) => i.status === 'connected').length,
   )
   const pct = completenessPercent(slices)
-  const overall = pickNumber(asRecord(company.health_scores).overall)
+  const subMap = subScoreMap(company?.health_scores)
+  const overallStored = pickNumber(asRecord(company?.health_scores).overall)
+
+  const latestRow = safeHistory[0]
+  const financialVal =
+    latestRow?.financial != null && Number.isFinite(Number(latestRow.financial))
+      ? Number(latestRow.financial)
+      : subMap['Financial'] ?? 0
+  const marketVal =
+    latestRow?.market != null && Number.isFinite(Number(latestRow.market))
+      ? Number(latestRow.market)
+      : subMap['Market'] ?? 0
+  const brandVal =
+    latestRow?.brand_social != null && Number.isFinite(Number(latestRow.brand_social))
+      ? Number(latestRow.brand_social)
+      : subMap['Brand / social'] ?? 0
+  const overallVal =
+    latestRow?.overall != null && Number.isFinite(Number(latestRow.overall))
+      ? Number(latestRow.overall)
+      : overallStored ?? subMap['Overall'] ?? null
+
+  if (isLoading) {
+    return (
+      <section className="space-y-6 animate-fade-in motion-reduce:animate-none">
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-48 w-full" />
+      </section>
+    )
+  }
+
+  if (!company || !companyId) {
+    return (
+      <section className="space-y-6">
+        <h1 className="text-3xl font-semibold tracking-tight">Company workspace</h1>
+        <Card className="p-8 text-center shadow-card">
+          <p className="text-muted-foreground">No company on file yet.</p>
+          <Button asChild className="mt-4 min-h-[44px] transition-transform duration-200 hover:scale-[1.02]">
+            <Link to="/company/create">Create company</Link>
+          </Button>
+        </Card>
+      </section>
+    )
+  }
 
   return (
-    <section className="space-y-8 animate-fade-in-up">
+    <section className="space-y-8 animate-fade-in-up motion-reduce:animate-none">
       <div className="flex flex-col gap-4 border-b border-border pb-6 md:flex-row md:items-start md:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">{company.name}</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">Company workspace</h1>
           <p className="mt-1 text-muted-foreground">
-            {[company.industry, company.stage].filter(Boolean).join(' · ') || 'Complete your profile for richer analysis.'}
+            Primary PulseBoard workspace — edit structured inputs, refresh rule-based scores, and launch AI analysis.
           </p>
-          {company.website && (
-            <a
-              href={company.website.startsWith('http') ? company.website : `https://${company.website}`}
-              className="mt-2 inline-block text-sm font-medium text-primary hover:underline"
-              target="_blank"
-              rel="noreferrer"
-            >
-              {company.website}
-            </a>
-          )}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button asChild variant="primary" className="gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            className="min-h-[44px] gap-2"
+            disabled={computeHealth.isPending}
+            onClick={() => void computeHealth.mutateAsync({ companyId })}
+          >
+            <RefreshCw className={`h-4 w-4 ${computeHealth.isPending ? 'animate-spin' : ''}`} aria-hidden />
+            Refresh health score
+          </Button>
+          <Button asChild variant="primary" className="min-h-[44px] gap-2 transition-transform duration-200 hover:scale-[1.02]">
             <Link to="/generate">
               <Sparkles className="h-4 w-4" />
-              Analyze
+              Generate analysis
             </Link>
           </Button>
-          <Button asChild variant="secondary">
+          <Button asChild variant="secondary" className="min-h-[44px]">
             <Link to="/settings">Integrations</Link>
           </Button>
         </div>
       </div>
 
+      <ProfileSummaryCard company={company} />
+
       <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="p-6 transition-shadow duration-200 hover:shadow-lg lg:col-span-2">
-          <h2 className="text-lg font-semibold">Health score</h2>
-          <p className="text-sm text-muted-foreground">Drill-down from stored scoring model.</p>
-          <div className="mt-4 text-4xl font-semibold text-primary">{overall ?? '—'}</div>
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            {healthSubscores(company.health_scores).map((s) => (
-              <div key={s.label} className="rounded-xl border border-border p-4">
-                <p className="text-xs font-medium text-muted-foreground">{s.label}</p>
-                <p className="text-xl font-semibold">{s.value}</p>
-              </div>
-            ))}
-          </div>
-        </Card>
-        <Card className="p-6">
-          <h2 className="text-lg font-semibold">Data completeness</h2>
+        {healthLoading ? (
+          <Skeleton className="h-80 w-full lg:col-span-2" />
+        ) : (
+          <HealthBreakdownPanel
+            className="lg:col-span-2"
+            overall={overallVal}
+            financial={financialVal}
+            market={marketVal}
+            brandSocial={brandVal}
+            history={safeHistory}
+          />
+        )}
+        <Card className="border-border/80 p-6 shadow-card">
+          <h2 className="text-lg font-semibold tracking-tight">Data completeness</h2>
           <Progress value={pct} className="mt-4" />
           <p className="mt-2 text-sm text-muted-foreground">{pct}% complete</p>
+          <p className="mt-4 text-xs text-muted-foreground">
+            Guided slices include profile, financials, market, social, and at least one connector.
+          </p>
         </Card>
       </div>
 
+      <SaveInputSnapshotPanel
+        companyId={companyId}
+        company={company}
+        financials={agg?.financials ?? null}
+        market={agg?.market ?? null}
+        social={agg?.social ?? null}
+      />
+
+      <AnalysisHistoryTimeline
+        entries={safeHistory}
+        selectedId={selectedHealthId}
+        onSelect={(e) => setSelectedHealthId((prev) => (prev === e.id ? null : e.id))}
+      />
+
       <Tabs defaultValue="overview">
-        <TabsList className="w-full flex-wrap justify-start">
+        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="data">Edit data</TabsTrigger>
           <TabsTrigger value="financials">Financials</TabsTrigger>
           <TabsTrigger value="market">Market</TabsTrigger>
           <TabsTrigger value="social">Social</TabsTrigger>
@@ -125,9 +188,9 @@ export function CompanyDetailPage() {
         </TabsList>
         <TabsContent value="overview">
           <div className="grid gap-6 md:grid-cols-2">
-            <Card className="p-6">
-              <h3 className="font-medium">Connector status</h3>
-              <ul className="mt-3 space-y-2 text-sm">
+            <Card className="border-border/80 p-6 shadow-card transition-shadow duration-200 hover:shadow-md">
+              <h3 className="font-semibold">Connector status</h3>
+              <ul className="mt-3 space-y-2 text-sm" aria-label="Integration connectors">
                 {(integrations ?? []).length === 0 ? (
                   <li className="text-muted-foreground">No connectors yet.</li>
                 ) : (
@@ -139,12 +202,12 @@ export function CompanyDetailPage() {
                   ))
                 )}
               </ul>
-              <Button asChild variant="ghost" className="mt-4 w-full">
+              <Button asChild variant="ghost" className="mt-4 w-full min-h-[44px]">
                 <Link to="/settings">Manage integrations</Link>
               </Button>
             </Card>
-            <Card className="p-6">
-              <h3 className="font-medium">Snapshot signals</h3>
+            <Card className="border-border/80 p-6 shadow-card transition-shadow duration-200 hover:shadow-md">
+              <h3 className="font-semibold">Snapshot signals</h3>
               {aggLoading ? (
                 <Skeleton className="mt-4 h-24 w-full" />
               ) : (
@@ -158,28 +221,37 @@ export function CompanyDetailPage() {
             </Card>
           </div>
         </TabsContent>
+        <TabsContent value="data">
+          <CompanyWorkspaceForms
+            companyId={companyId}
+            company={company}
+            financials={agg?.financials ?? null}
+            market={agg?.market ?? null}
+            social={agg?.social ?? null}
+          />
+        </TabsContent>
         <TabsContent value="financials">
-          <Card className="p-6">
+          <Card className="border-border/80 p-6 shadow-card">
             <p className="text-sm text-muted-foreground">
-              Edit structured financial metrics used for scoring and AI prompts.
+              Full-page editor with uploads and calculators lives on the dedicated financials route.
             </p>
-            <Button asChild className="mt-4">
+            <Button asChild className="mt-4 min-h-[44px]">
               <Link to="/financials">Open financials form</Link>
             </Button>
           </Card>
         </TabsContent>
         <TabsContent value="market">
-          <Card className="p-6">
-            <p className="text-sm text-muted-foreground">Competitors, pricing matrix, and opportunity/threat tags.</p>
-            <Button asChild className="mt-4">
+          <Card className="border-border/80 p-6 shadow-card">
+            <p className="text-sm text-muted-foreground">Structured competitor matrix and threat/opportunity tags.</p>
+            <Button asChild className="mt-4 min-h-[44px]">
               <Link to="/market">Open market data form</Link>
             </Button>
           </Card>
         </TabsContent>
         <TabsContent value="social">
-          <Card className="p-6">
-            <p className="text-sm text-muted-foreground">Channels, engagement, and web traffic inputs.</p>
-            <Button asChild className="mt-4">
+          <Card className="border-border/80 p-6 shadow-card">
+            <p className="text-sm text-muted-foreground">Channel metrics, cadence, and traffic inputs.</p>
+            <Button asChild className="mt-4 min-h-[44px]">
               <Link to="/social-brand">Open social & brand form</Link>
             </Button>
           </Card>
@@ -187,15 +259,15 @@ export function CompanyDetailPage() {
         <TabsContent value="reports">
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-lg font-semibold">Analysis runs</h3>
-              <Button asChild variant="primary">
+              <h3 className="text-lg font-semibold tracking-tight">Analysis runs</h3>
+              <Button asChild variant="primary" className="min-h-[44px]">
                 <Link to="/generate">New analysis</Link>
               </Button>
             </div>
             {agg?.latestReport ? (
-              <Card className="p-4">
+              <Card className="border-border/80 p-4 shadow-card">
                 <p className="text-sm text-muted-foreground">Latest aggregate: {agg.latestReport.status}</p>
-                <Button asChild className="mt-2">
+                <Button asChild className="mt-2 min-h-[44px]">
                   <Link to={`/report/${agg.latestReport.id}`}>Open latest</Link>
                 </Button>
               </Card>

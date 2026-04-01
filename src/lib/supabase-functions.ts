@@ -11,6 +11,74 @@ export interface AnalyzeCompanyResponse {
   }
 }
 
+export interface ComputeHealthScoreResponse {
+  data: {
+    healthScore: {
+      id: string
+      company_id: string
+      scored_at: string
+      overall: number
+      financial: number | null
+      market: number | null
+      brand_social: number | null
+      source: string
+    }
+    breakdown: { financial: number; market: number; brandSocial: number; overall: number }
+  }
+}
+
+export async function invokeComputeHealthScore(body: {
+  companyId: string
+  benchmarks?: Record<string, unknown>
+  notes?: string
+}): Promise<ComputeHealthScoreResponse> {
+  if (!supabase) {
+    throw new Error('Supabase is not configured')
+  }
+
+  const url = import.meta.env.VITE_SUPABASE_URL
+  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
+  if (!url || !anon) {
+    throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  if (!session?.access_token) {
+    throw new Error('Sign in required')
+  }
+
+  const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/compute-health-score`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      apikey: anon,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+
+  const json = (await res.json()) as ComputeHealthScoreResponse & { error?: unknown }
+
+  if (!res.ok) {
+    const errMsg =
+      typeof json.error === 'string'
+        ? json.error
+        : json.error !== undefined
+          ? JSON.stringify(json.error)
+          : `Health score request failed (${res.status})`
+    throw new Error(errMsg)
+  }
+
+  if (!json.data?.healthScore?.id) {
+    throw new Error('Invalid response from compute-health-score')
+  }
+
+  return json as ComputeHealthScoreResponse
+}
+
 export async function invokeAnalyzeCompanyHealth(
   body: AnalyzeCompanyRequest,
 ): Promise<AnalyzeCompanyResponse> {

@@ -114,6 +114,56 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['report_snapshots']['Insert']>
         Relationships: []
       }
+      company_health_scores: {
+        Row: {
+          id: string
+          company_id: string
+          report_id: string | null
+          scored_at: string
+          overall: number
+          financial: number | null
+          market: number | null
+          brand_social: number | null
+          benchmarks: Record<string, unknown>
+          notes: string | null
+          source: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          report_id?: string | null
+          scored_at?: string
+          overall: number
+          financial?: number | null
+          market?: number | null
+          brand_social?: number | null
+          benchmarks?: Record<string, unknown>
+          notes?: string | null
+          source?: string
+        }
+        Update: Partial<Database['public']['Tables']['company_health_scores']['Insert']>
+        Relationships: []
+      }
+      company_input_snapshots: {
+        Row: {
+          id: string
+          company_id: string
+          created_by: string | null
+          label: string
+          payload: Record<string, unknown>
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          created_by?: string | null
+          label?: string
+          payload?: Record<string, unknown>
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['company_input_snapshots']['Insert']>
+        Relationships: []
+      }
       integrations: {
         Row: {
           id: string
