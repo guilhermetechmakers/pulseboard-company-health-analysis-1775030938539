@@ -11,17 +11,6 @@ type Financials = Database['public']['Tables']['company_financials']['Row']
 type Market = Database['public']['Tables']['company_market_data']['Row']
 type Social = Database['public']['Tables']['company_social']['Row']
 
-async function fetchUserCompany(): Promise<Company | null> {
-  if (!supabase) return null
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return null
-  const { data, error } = await supabase.from('companies').select('*').eq('user_id', user.id).maybeSingle()
-  if (error) return null
-  return data ?? null
-}
-
 async function fetchCompanyContext(companyId: string): Promise<{
   financials: Financials | null
   market: Market | null
@@ -40,13 +29,6 @@ async function fetchCompanyContext(companyId: string): Promise<{
     market: market.data ?? null,
     social: social.data ?? null,
   }
-}
-
-export function useUserCompany() {
-  return useQuery({
-    queryKey: ['user-company'],
-    queryFn: fetchUserCompany,
-  })
 }
 
 export function useCompanyAnalysisContext(companyId: string | null) {
@@ -142,7 +124,7 @@ export function useRunAnalysis() {
       toast.success('Analysis completed')
       await queryClient.invalidateQueries({ queryKey: ['company-reports', vars.companyId] })
       await queryClient.invalidateQueries({ queryKey: ['company-aggregates', vars.companyId] })
-      await queryClient.invalidateQueries({ queryKey: ['user-company'] })
+      await queryClient.invalidateQueries({ queryKey: ['company', 'mine'] })
     },
     onError: (e: Error) => {
       toast.error(e.message ?? 'Analysis failed')

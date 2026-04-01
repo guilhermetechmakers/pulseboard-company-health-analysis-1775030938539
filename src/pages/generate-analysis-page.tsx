@@ -6,12 +6,8 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { AiAnalysisComposer } from '@/components/analysis/ai-analysis-composer'
 import { ProgressStepper } from '@/components/analysis/progress-stepper'
-import {
-  useCompanyAnalysisContext,
-  useCompleteness,
-  useRunAnalysis,
-  useUserCompany,
-} from '@/hooks/use-analysis'
+import { useCompanyAnalysisContext, useCompleteness, useRunAnalysis } from '@/hooks/use-analysis'
+import { useMyCompany } from '@/hooks/use-my-company'
 import { supabase } from '@/lib/supabase'
 import type { AnalysisDepth } from '@/types/analysis'
 
@@ -24,7 +20,7 @@ const STEPS = [
 
 export function GenerateAnalysisPage() {
   const navigate = useNavigate()
-  const { data: company, isLoading: companyLoading } = useUserCompany()
+  const { data: company, isLoading: companyLoading } = useMyCompany()
   const companyId = company?.id ?? null
   const { data: ctx } = useCompanyAnalysisContext(companyId)
   const { fields, percent } = useCompleteness(company, ctx)
