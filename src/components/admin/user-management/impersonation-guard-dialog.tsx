@@ -96,3 +96,5 @@ export function ImpersonationGuardDialog({ user, open, onClose }: ImpersonationG
     </div>
   )
 }
+
+export { ImpersonationGuardDialog as ImpersonationGuard }

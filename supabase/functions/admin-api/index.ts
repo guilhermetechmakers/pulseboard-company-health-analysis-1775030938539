@@ -9,6 +9,7 @@ import { corsHeaders } from '../_shared/cors.ts'
 
 type AdminAction =
   | 'metrics_usage'
+  | 'user_management_stats'
   | 'system_health'
   | 'users_list'
   | 'users_get'
@@ -483,6 +484,59 @@ serve(async (req) => {
       })
     }
 
+    if (action === 'user_management_stats') {
+      const [{ count: totalUsers }, { count: suspendedUsers }, { data: roleRows }, { data: suspActs }] =
+        await Promise.all([
+          supabaseAdmin.from('profiles').select('id', { count: 'exact', head: true }),
+          supabaseAdmin
+            .from('profiles')
+            .select('id', { count: 'exact', head: true })
+            .eq('account_status', 'suspended'),
+          supabaseAdmin.from('profiles').select('role'),
+          supabaseAdmin
+            .from('admin_actions')
+            .select('created_at')
+            .eq('action', 'user_status_suspended')
+            .gte('created_at', new Date(Date.now() - 7 * 86400000).toISOString()),
+        ])
+
+      const total = num(totalUsers, 0)
+      const suspended = num(suspendedUsers, 0)
+      const activeUsers = Math.max(0, total - suspended)
+
+      const roleMap = new Map<string, number>()
+      for (const row of Array.isArray(roleRows) ? roleRows : []) {
+        if (!isRecord(row)) continue
+        const role = typeof row.role === 'string' && row.role.trim() ? row.role : 'founder'
+        roleMap.set(role, (roleMap.get(role) ?? 0) + 1)
+      }
+      const roleDistribution = [...roleMap.entries()]
+        .map(([role, count]) => ({ role, count }))
+        .sort((a, b) => b.count - a.count)
+
+      const suspByDay = new Map<string, number>()
+      for (const row of Array.isArray(suspActs) ? suspActs : []) {
+        if (!isRecord(row)) continue
+        const ca = typeof row.created_at === 'string' ? row.created_at : ''
+        if (!ca) continue
+        const day = ca.slice(0, 10)
+        suspByDay.set(day, (suspByDay.get(day) ?? 0) + 1)
+      }
+      const suspensionTrend = [...suspByDay.entries()]
+        .map(([date, count]) => ({ date, count }))
+        .sort((a, b) => a.date.localeCompare(b.date))
+
+      return json({
+        data: {
+          totalUsers: total,
+          activeUsers,
+          suspendedUsers: suspended,
+          roleDistribution,
+          suspensionTrend,
+        },
+      })
+    }
+
     if (action === 'usage_series') {
       const days = Math.min(90, Math.max(7, num(body.days, 30)))
       const since = new Date(Date.now() - days * 86400000).toISOString()
@@ -936,7 +990,7 @@ serve(async (req) => {
 
     if (action === 'users_patch') {
       const userId = str(body.userId)
-      if (!userId) return json({ error: 'userId required' }, 400)
+      if (!userId || !isUuid(userId)) return json({ error: 'Valid userId required' }, 400)
       const nextRole = str(body.role)
       const nextStatus = str(body.status) as 'active' | 'suspended' | undefined
       const allowedRoles = new Set(['founder', 'consultant', 'investor', 'other', 'admin'])
@@ -1618,6 +1672,7 @@ serve(async (req) => {
       error: 'Unknown action',
       allowed: [
         'metrics_usage',
+        'user_management_stats',
         'system_health',
         'users_list',
         'users_get',

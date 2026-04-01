@@ -130,3 +130,12 @@ export interface AdminUserPatchBody {
   role?: string
   status?: 'active' | 'suspended'
 }
+
+/** Aggregates for admin user-management analytics (Recharts + KPIs). */
+export interface AdminUserManagementStats {
+  totalUsers: number
+  activeUsers: number
+  suspendedUsers: number
+  roleDistribution: { role: string; count: number }[]
+  suspensionTrend: { date: string; count: number }[]
+}

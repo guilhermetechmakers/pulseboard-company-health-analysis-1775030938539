@@ -5,6 +5,7 @@ import {
   fetchAdminUserDetail,
   fetchAdminUsers,
   fetchAdminUsersExportJobStatus,
+  fetchUserManagementStats,
   impersonateAdminUser,
   patchAdminUser,
   startAdminUsersExportJob,
@@ -64,6 +65,14 @@ export function useAdminCompaniesPicklistQuery() {
   })
 }
 
+export function useAdminUserManagementStatsQuery() {
+  return useQuery({
+    queryKey: ['admin', 'user-management-stats'],
+    queryFn: () => fetchUserManagementStats(),
+    staleTime: 1000 * 60 * 2,
+  })
+}
+
 export function usePatchAdminUser() {
   const qc = useQueryClient()
   return useMutation({
@@ -108,6 +117,7 @@ export function usePatchAdminUser() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['admin', 'users'] })
       void qc.invalidateQueries({ queryKey: ['admin', 'metrics'] })
+      void qc.invalidateQueries({ queryKey: ['admin', 'user-management-stats'] })
       void qc.invalidateQueries({ queryKey: ['admin', 'activity'] })
     },
   })

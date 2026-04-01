@@ -60,7 +60,14 @@ export function UserDetailModal({ summaryUser, open, onClose }: UserDetailModalP
                   </div>
                   <div className="flex justify-between gap-4">
                     <dt className="text-muted-foreground">Roles</dt>
-                    <dd>{(user?.roles ?? summaryUser.roles ?? [summaryUser.role]).join(', ')}</dd>
+                    <dd>
+                      {(Array.isArray(user?.roles)
+                        ? user.roles
+                        : Array.isArray(summaryUser.roles)
+                          ? summaryUser.roles
+                          : [summaryUser.role]
+                      ).join(', ')}
+                    </dd>
                   </div>
                   <div className="flex justify-between gap-4">
                     <dt className="text-muted-foreground">Status</dt>

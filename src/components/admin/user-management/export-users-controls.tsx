@@ -80,3 +80,6 @@ export function ExportUsersControls({
     </div>
   )
 }
+
+/** Spec alias: export controls for user CSV/JSON and job-backed export. */
+export { ExportUsersControls as ExportButton }

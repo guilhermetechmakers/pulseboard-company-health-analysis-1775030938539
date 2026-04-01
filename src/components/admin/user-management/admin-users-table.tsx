@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, UserCog } from 'lucide-react'
+import { Activity, ArrowDown, ArrowUp, UserCog } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -68,7 +68,7 @@ export function AdminUsersTable({
                 User ID
               </th>
               <th scope="col" className="px-3 py-3">
-                <SortBtn col="email" label="User" />
+                <SortBtn col="email" label="Email / name" />
               </th>
               <th scope="col" className="px-3 py-3">
                 <SortBtn col="role" label="Role" />
@@ -151,7 +151,18 @@ export function AdminUsersTable({
                       </span>
                     </td>
                     <td className="px-3 py-3 text-right">
-                      <div className="inline-flex flex-wrap items-center justify-end gap-2">
+                      <div className="inline-flex flex-wrap items-center justify-end gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="h-9 px-2 text-xs"
+                          disabled={patchPending}
+                          onClick={() => onOpenDetail(u)}
+                          aria-label={`View activity and details for ${u.email || u.name}`}
+                          title="Details & activity"
+                        >
+                          <Activity className="h-4 w-4" aria-hidden />
+                        </Button>
                         <Switch
                           checked={u.status === 'suspended'}
                           onCheckedChange={() => onToggleSuspend(u)}
@@ -200,3 +211,5 @@ export function AdminUsersTable({
     </Card>
   )
 }
+
+export { AdminUsersTable as UserTable }

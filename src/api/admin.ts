@@ -13,6 +13,7 @@ import type {
   AdminUserDetailResponse,
   AdminUserExportBody,
   AdminUserExportResponse,
+  AdminUserManagementStats,
   AdminUserPatchBody,
   AdminUserRow,
   AdminUsersListResponse,
@@ -100,12 +101,64 @@ export function normalizeSystemHealth(raw: unknown): AdminSystemHealth {
 
 export function normalizeAdminUsersResponse(raw: unknown): AdminUsersListResponse {
   const r = isRecord(raw) ? raw : {}
+  let list: unknown[] = []
+  let totalRaw: unknown = r.total
+
   const dataRaw = r.data
-  const list = Array.isArray(dataRaw) ? dataRaw : []
+  if (Array.isArray(dataRaw)) {
+    list = dataRaw
+  } else if (isRecord(dataRaw) && Array.isArray(dataRaw.data)) {
+    list = dataRaw.data
+    totalRaw = dataRaw.total ?? r.total
+  }
+
   const data: AdminUserRow[] = list.map((row) => parseAdminUserRow(row)).filter((x): x is AdminUserRow => x !== null)
-  const totalRaw = r.total
   const total = typeof totalRaw === 'number' && Number.isFinite(totalRaw) ? totalRaw : data.length
   return { data, total }
+}
+
+export function normalizeUserManagementStats(raw: unknown): AdminUserManagementStats {
+  const r = isRecord(raw) ? raw : {}
+  const num = (k: string, d = 0) => {
+    const x = r[k]
+    return typeof x === 'number' && Number.isFinite(x) ? x : d
+  }
+  const rdRaw = r.roleDistribution
+  const roleDistribution = Array.isArray(rdRaw)
+    ? rdRaw
+        .map((item) => {
+          const o = isRecord(item) ? item : {}
+          const role = typeof o.role === 'string' ? o.role : ''
+          const count = typeof o.count === 'number' && Number.isFinite(o.count) ? o.count : 0
+          if (!role) return null
+          return { role, count }
+        })
+        .filter((x): x is { role: string; count: number } => x !== null)
+    : []
+  const stRaw = r.suspensionTrend
+  const suspensionTrend = Array.isArray(stRaw)
+    ? stRaw
+        .map((item) => {
+          const o = isRecord(item) ? item : {}
+          const date = typeof o.date === 'string' ? o.date : ''
+          const count = typeof o.count === 'number' && Number.isFinite(o.count) ? o.count : 0
+          if (!date) return null
+          return { date, count }
+        })
+        .filter((x): x is { date: string; count: number } => x !== null)
+    : []
+  return {
+    totalUsers: num('totalUsers'),
+    activeUsers: num('activeUsers'),
+    suspendedUsers: num('suspendedUsers'),
+    roleDistribution,
+    suspensionTrend,
+  }
+}
+
+export async function fetchUserManagementStats(): Promise<AdminUserManagementStats> {
+  const res = await invokeAdminApi({ action: 'user_management_stats' })
+  return normalizeUserManagementStats(unwrapData(res))
 }
 
 function parseAdminUserRow(row: unknown): AdminUserRow | null {

@@ -326,245 +326,190 @@ All dashboard pages should be nested inside the dashboard layout, not separate r
 
 ## User Design Requirements
 
-typography, spacing, color tokens, and component styling to match PulseBoard
+# Admin - User Management
+
+## Overview
+Build an Admin page to manage users with capabilities to view user roles, suspend/reactivate accounts, impersonate for support/auditing, and export user lists for support. This feature tightly integrates with core data setup and access control, and surfaces admin analytics metrics to inform product decisions and customer management. All data is stored and retrieved securely, with robust runtime safety guards to prevent crashes when data is missing or null.
+
+## Page Description (Full Detail)
+What this page is:
+- The Admin - User Management page provides administrators a centralized view of all users, including their roles, statuses (active vs suspended), last activity, linked organizations/companies, and audit-friendly actions. It also includes an export function to generate CSVs for support teams.
+
+Goals:
+- Provide a fast, searchable, filterable table of users.
+- Show roles and status clearly; allow suspending/reactivating accounts.
+- Support impersonation for debugging and support (with audit trail).
+- Enable exporting user data to CSV for downstream support workflows.
+- Tie into Admin Analytics to surface usage metrics about user activity, role distribution, and suspension trends (as a foundation for product decisions and customer management).
+
+Connected features:
+- Admin Analytics: Collect and surface usage metrics to inform product decisions and to help support/manage customers.
+- Authentication/Authorization: Ensure only admins can view/manage users; impersonation should be auditable and restricted.
+- Core Data Setup: Users table, roles/permissions, and user activity events must exist.
+
+UI elements and visual guidance:
+- Top bar: page title, global search, and quick actions.
+- Filters: by role, status (active/suspended), registration date range, and company/organization.
+- User table: columns for User ID, Name, Email, Role(s), Status, Last Active, Created At, Linked Companies, and Actions.
+- Inline or modal details: Expandable row or “Details” modal showing recent activity, last login, and companies linked.
+- Actions:
+  - Suspend / Reactivate toggle with confirmation modal.
+  - Impersonate button with a safe audit trail (requires admin confirmation).
+  - View Activity button to inspect recent actions.
+- Export: CSV export button with options to export current filters or full dataset; show export progress/notification.
+- Visual style: align with the project design system, consistent typography, spacing, colors, and accessible contrast.
 
 API integrations:
-- No external APIs beyond internal app endpoints for data, analysis status, and notifications. Local simulation or mock as needed for dev. The page must be able to operate with real-time progress updates when the AI engine runs.
-
-PROJECT CONTEXT: Target Page and Connected Features
-- Target Page: Generate Analysis
-- Project: PulseBoard — Company Health Analysis
-- Core components: AI Analysis Engine, Notifications & Emails, Company Detail workspace
-- Data flows: User fills data -> Start Analysis -> AI engine runs -> Progress/logs -> Results -> Notify user -> Option to export/view report
-
----
+- No external APIs are required for this task; all data interactions use the app’s backend (Supabase or equivalent) with guarded responses.
+- Ensure API responses are validated and guarded against nulls; use data ?? [] patterns.
 
 ## Components to Build
-
-- GenerateAnalysisPage (UI + logic)
-  - Props/state: user, company, data completeness, depth, benchmarks, consent, sendToEmail, email, isLoading, progress, logs, results
-  - Subcomponents:
-    - DataCompletenessChecklist
-    - AnalysisOptionsPanel (DepthSelector, BenchmarksToggle, SendToEmailToggle, EmailInput)
-    - ConsentSection
-    - StartAnalysisButton (with validation)
-    - ProgressPanel (progress bar, live logs)
-    - ResultsSummaryCard (summary snippet + CTA to Report Viewer)
-    - NotificationsPanel/Toast placeholder (integrates with Notifications)
-- AIAnalysisEngineOrchestrator
-  - Orchestrates steps:
-    - Build prompts based on depth and benchmarks
-    - Execute prompts to generate: Executive Summary, SWOT, Financial/Market/Social analyses, Risks, Opportunities, Action Plan
-  - State machine: Idle -> Validating -> Running -> Completed -> Failed
-  - Emits progress updates and final results payload
-  - Ensures results are stored in a structured format for Report Viewer
-- NotificationsIntegrator
-  - Triggers transactional and in-app notifications for:
-    - Analysis Completed
-    - Export Ready
-    - Analysis Failed
-    - Billing events
-    - Admin alerts
-  - Integrates with email provider for SendToEmail flow
-- ReportViewerLink
-  - Link/button to open the full Report Viewer, passing analysisId
-- DataValidators
-  - Consistent validation utilities for API responses and UI inputs
-- Placeholder/Mock Services (for dev)
-  - If no backend yet, implement mock services with deterministic progress sequences
-
----
+- AdminUserManagementPage
+  - Layout with header, filters, actions, and user table.
+  - Connects to data layer to fetch users with applied filters and pagination.
+- UserTable
+  - Renders user rows with proper guards for missing data.
+  - Includes actions column with suspend/reactivate and impersonate buttons.
+- UserDetailModal
+  - Shows user activity, linked companies, and recent events.
+  - Read-only or with limited admin actions.
+- ExportButton
+  - Triggers CSV generation on the backend; shows progress and results.
+- ImpersonationGuard
+  - Handles UI/UX for initiating impersonation and ensuring audit trail.
+- AdminAnalyticsPanel (optional integration surface)
+  - Display usage metrics related to user management (admin-focused metrics).
 
 ## Implementation Requirements
 
 ### Frontend
-- Components must be built with React (or framework in stack) using TypeScript.
-- Ensure runtime safety:
-  - All arrays use proper defaults: useState<T[]>([]) and guards for null data
-  - Use data ?? [] for any Supabase-like results
-  - Guard every array operation: (items ?? []).map(...) or Array.isArray(items) ? items.map(...) : []
-  - Access nested API responses with optional chaining and default fallbacks
-  - Provide destructuring with defaults: const { items = [], count = 0 } = response ?? {}
-- UI/UX:
-  - All elements styled via the project design system
-  - Accessible controls (labels, ARIA attributes)
-  - Form validations and clear error messages
-- State management:
-  - Local component state for GenerateAnalysisPage
-  - Global state or context (if available) for current user, company, and ongoing analyses
-  - Persist analysis progress in a stable store or backend record (analysisId)
-- Real-time progress:
-  - Implement progress updates via polling or WebSocket-like mechanism (simulate in dev)
-  - Logs should stream progressively with timestamps
-- Data safety:
-  - Ensure consent is required before enabling Start Analysis
-  - Ensure user cannot generate without complete data and consent
-- Accessibility:
-  - Keyboard navigable, screen-reader friendly
+- Routing
+  - Protect the Admin/User Management route so only users with admin role can access.
+- State management
+  - Use React with proper useState/useEffect hooks.
+  - Arrays and objects must be initialized with correct defaults: useState<User[]>([]), etc.
+- Components
+  - Ensure all components guard against null/undefined data before calling array methods:
+    - Example: (users ?? []).map(...) or Array.isArray(users) ? users.map(...) : []
+  - Debounced search input for performance.
+  - Accessible controls with aria-labels.
+- Data fetching
+  - Use a safe fetch pattern with validation: const list = Array.isArray(response?.data) ? response.data : [].
+  - Null-safe pagination and total counts.
+- Actions
+  - Suspend/Reactivate flows: confirmation dialogs; optimistic UI updates with rollback on error.
+  - Impersonation: prompt confirmation; record audit in frontend; pass audit flag to backend.
+- Export
+  - Trigger backend CSV generation; poll/subscribe for completion; provide a downloadable link when ready.
 
 ### Backend
-- APIs and data models (to be implemented or wired):
-  - Create Analysis Record
-    - POST /api/analyses
-    - Body: { companyId, depth: 'brief'|'standard'|'deep', includeBenchmarks: boolean, sendToEmail: boolean, email?: string, consentGiven: boolean }
-    - Response: { analysisId, status: 'queued'|'running'|'completed'|'failed', startedAt, progress: number }
-  - Get Analysis Status
-    - GET /api/analyses/{analysisId}
-    - Response: { analysisId, status, progress, logs: string[], results?: { executiveSummary, swot, financial, market, social, risks, opportunities, actionPlan } }
-  - Notification trigger endpoints (internal usage)
-    - POST /api/notifications/trigger
-- Data models:
-  - CompanyProfile
-  - AnalysisRecord
-    - id, companyId, userId, depth, includeBenchmarks, consentGiven, sendToEmail, email, status, progress, startedAt, completedAt, resultPayload (structured JSON)
-  - HealthMetrics (for potential Health Score usage)
-- Validation:
-  - Server should validate input shapes and guard against missing fields
-  - Ensure analysis results are stored with non-null shapes
-- Security:
-  - Auth required for creating and fetching analyses
-  - Access control: user is allowed to access analyses for their company
-- Storage:
-  - Persist analysis results to a JSON payload that's consumable by Report Viewer
-  - Maintain history/logs for each analysis
+- Data models
+  - Users table with fields: id, name, email, roles (array), status, created_at, last_active_at, linked_companies (array), etc.
+  - Roles/permissions mapping for admin checks.
+  - Audit logs for impersonation and suspend/reactivate actions.
+- APIs
+  - GET /admin/users with query params for search, role, status, date ranges, pagination.
+  - POST /admin/users/{id}/suspend to suspend (and /reactivate to reactivate).
+  - POST /admin/users/{id}/impersonate to initiate impersonation, with audit token generation.
+  - GET /admin/users/{id} for user detail in the modal.
+  - GET /admin/users/export to generate CSV; or POST /admin/users/export with filters; endpoint returns a job id.
+  - GET /admin/users/export/{jobId} to fetch export status and download URL when ready.
+- Validation
+  - Validate input payloads; ensure required fields exist; guard against malformed IDs.
+- Security
+  - Role-based access control; every admin endpoint requires proper authorization.
+  - Audit trail for impersonation and suspend actions.
 
 ### Integration
-- Frontend -> Backend
-  - Start Analysis triggers creation of AnalysisRecord and starts engine
-  - Polling or real-time feed to update progress and logs
-  - On completion, load results into Report Viewer
-  - Trigger NotificationsIntegrator for status changes
-- Data flow safeguards:
-  - All API responses validated; if response shape is unexpected, fallback to safe defaults
-  - Use nullish checks for optional fields
-  - Ensure arrays from API calls are guarded and mapped safely
-
----
+- Data flow
+  - Frontend queries /admin/users with applied filters; table renders with safe guards.
+  - Suspend/Reactivate actions trigger backend mutations; frontend reflects state with optimistic updates and error fallbacks.
+  - Impersonation action communicates securely; audit event recorded.
+  - CSV export is orchestrated server-side; once ready, a download link is presented.
+- Analytics integration
+  - Emit events or metrics for user management activity (admin actions, suspension counts, impersonation events) to Admin Analytics pipeline.
 
 ## User Experience Flow
-
-1. User authenticates and lands on Company Detail workspace (primary, persistent).
-2. User fills or reviews Profile, Financials, Market, and Social data. Data completeness is computed in real-time.
-3. User navigates to Generate Analysis section within the same page or a dedicated sub-view.
-4. User selects analysis depth (brief/standard/deep), toggles benchmarks, optionally enables “send to email” with an email address.
-5. User reviews consent for AI processing; user checks consent box.
-6. Start Analysis button becomes enabled only when required data is complete and consent is given.
-7. User clicks Start Analysis.
-8. UI shows a progress bar, live logs, and status indicators (queued/running).
-9. AI Analysis Engine orchestrates prompts based on chosen depth and benchmarks; progress is updated in real-time.
-10. Upon completion, results payload is stored; UI shows a Results Summary with a CTA to open the full Report Viewer.
-11. Notifications & Inbox receive an entry for analysis completed; if email is configured, a transactional email is sent.
-12. User can export the report or view the full report in Report Viewer; success or failure states are reflected in UI and notifications.
-
----
+1. Admin lands on Admin - User Management.
+2. Page loads: fetch users, show loading skeletons; if no data, show empty state with guidance.
+3. Admin uses search box and filters to refine user list.
+4. Admin expands a user row or opens a Details modal to view recent activity and linked companies.
+5. Admin clicks Suspend to suspend an active user or Reactivate to restore an suspended account; confirm; observe optimistic UI update; on error, revert.
+6. Admin clicks Impersonate on a user; confirms; system logs impersonation and redirects/admin session switch occurs with audit trail.
+7. Admin clicks Export to generate a CSV; show progress; provide a download link when ready; optionally allow exporting only filtered results.
+8. Admin Analytics panel (if visible) surfaces metrics such as number of users, active vs suspended ratio, role distribution, and recent suspension trends.
 
 ## Build Order & Dependencies (Mandatory)
-
 - Prerequisites:
-  - User authentication system in place
-  - Core Company Detail workspace scaffolding and data models (Profile, Financials, Market, Social)
-  - Notification system (in-app and email) scaffold
-  - Design system and UI components for forms, checklists, and progress indicators
+  - Core authentication/authorization system with admin role enforcement.
+  - Users table and roles/permissions data model in the database.
+  - Admin Analytics infrastructure for metrics collection (can be optional for initial MVP but must be planned).
 - Blocks:
-  - Core AI Analysis Engine (orchestrator) with data contracts and prompt templates
-  - Backend APIs for analyses (create, status, results) and notification triggers
-  - Frontend components for Generate Analysis page and integration with Report Viewer
+  - Block 1: User data model and admin authorization scaffolding.
+  - Block 2: Backend CRUD endpoints for user suspension/reactivation and impersonation.
+  - Block 3: CSV export workflow and status polling.
+  - Block 4: Admin UI components and page wiring.
+  - Block 5: Integration with Admin Analytics (event emission).
 - Sequencing Rule:
-  - Auth/access control and core data setup must be completed before dashboard/workspace/analytics pages when both exist
-
----
+  - Authentication/access control and core data setup must be completed before dashboard/workspace/analytics pages when both exist.
 
 ## Technical Specifications
-
-- Data Models:
-  - AnalysisRecord
-    - id: string
-    - companyId: string
-    - userId: string
-    - depth: 'brief'|'standard'|'deep'
-    - includeBenchmarks: boolean
-    - consentGiven: boolean
-    - sendToEmail: boolean
-    - email?: string
-    - status: 'queued'|'running'|'completed'|'failed'
-    - progress: number (0-100)
-    - startedAt: string (ISO)
-    - completedAt?: string (ISO)
-    - resultPayload?: {
-        executiveSummary: string
-        swot: any
-        financial: any
-        market: any
-        social: any
-        risks: string[]
-        opportunities: string[]
-        actionPlan: any
-      }
-    - logs?: string[]
-- API Endpoints:
-  - POST /api/analyses
-  - GET /api/analyses/{analysisId}
-  - POST /api/notifications/trigger
-- Security:
-  - JWT-based authentication
-  - Authorization checks to ensure user can access companyId
-  - Input validation on all endpoints
-- Validation:
-  - Use robust type guards and runtime checks
-  - Normalize API responses: const payload = Array.isArray(res?.data) ? res.data : []
-- Optional Data Handling:
-  - All optional fields guarded with nullish coalescing and optional chaining
-  - Default to empty arrays/objects where applicable
-
----
+- Data Models
+  - User: id, name, email, roles (string[]), status ('active'|'suspended'), created_at, last_active_at, linked_companies (string[]), impersonation_token (nullable string), etc.
+  - AuditLog: id, action, performed_by, target_user_id, timestamp, details.
+- API Endpoints
+  - GET /admin/users?search=&role=&status=&from=&to&page=&perPage=
+  - POST /admin/users/{id}/suspend
+  - POST /admin/users/{id}/reactivate
+  - POST /admin/users/{id}/impersonate
+  - GET /admin/users/{id}
+  - POST /admin/users/export
+  - GET /admin/users/export/{jobId}
+- Security
+  - Require admin role for all endpoints.
+  - Use CSRF/tokeneering as per existing auth system.
+  - Audit logs for impersonation and suspend actions; sensitive actions require confirmation.
+- Validation
+  - Validate inputs for filters, IDs, and payloads; use Array.isArray checks; guard against null data.
+- Runtime Safety Rules
+  - Supabase-like results: use data ?? [].
+  - Guard array methods: (items ?? []).map(...) or Array.isArray(items) ? items.map(...) : [].
+  - useState defaults: useState<User[]>([]), useState<Company[]>([]) where appropriate.
+  - Optional chaining for nested API data: obj?.property?.nested.
+  - Destructuring with defaults: const { items = [], count = 0 } = response ?? {}.
 
 ## Acceptance Criteria
-
-- [ ] Generate Analysis page renders with:
-  - Data completeness indicators and consent required
-  - Depth selection, benchmarks toggle, and email option
-  - Start button disabled until required data present and consent given
-  - Real-time progress display with logs
-  - Final Results Summary and link to Report Viewer
-- [ ] AI Analysis Engine:
-  - Creates analyses with correct metadata
-  - Executes prompts based on depth and benchmarks
-  - Produces structured resultPayload consumable by Report Viewer
-  - Emits progress updates and handles errors gracefully
-- [ ] Notifications & Emails integration:
-  - On completion: in-app notification and transactional email if enabled
-  - On failure: in-app notification
-  - Admin/billing alerts triggered appropriately
-- [ ] Company Detail workspace:
-  - Primary, persistent workspace with profile, health score breakdown, and analysis history
-  - Editable forms for profile, financials, market, and social data
-  - Health score recalculation after analysis results
-
----
+- [ ] Admin route is accessible only to users with admin role; unauthorized attempts are rejected with proper status.
+- [ ] User table renders with correct data; null-safe rendering using the runtime safety rules.
+- [ ] Suspend and Reactivate actions perform, with optimistic UI updates and rollback on failure.
+- [ ] Impersonation action creates an audit trail and initiates session switch; only admin can perform.
+- [ ] Export functionality generates a CSV; download becomes available; export respects current filters if chosen.
+- [ ] Details modal shows accurate last activity and linked companies; data loads safely with guards.
+- [ ] Admin Analytics metrics reflect admin actions (suspend counts, impersonations) when integrated.
+- [ ] All inputs validated; API responses normalized to safe arrays/objects.
 
 ## UI/UX Guidelines
-
-- Align with PulseBoard design system: typography, color tokens, spacing, and component styling
-- Clear affordances for actions, states, and success/failure feedback
-- Responsive layout: adapt to desktop and tablet widths
-- Ensure consistent micro-interactions (button hover states, progress updates, toast durations)
-
----
+- Align with the project design system for typography, spacing, and components.
+- Ensure responsive behavior for tablet/mobile admin view.
+- Use clear status indicators (badges) for active vs suspended.
+- Provide accessible controls (keyboard navigable, aria labels, focus rings).
+- Consistent error states and success notifications.
 
 ## Mandatory Coding Standards — Runtime Safety
 
 CRITICAL: Follow these rules in ALL generated code to prevent runtime crashes.
 
 1. Supabase query results: Always use nullish coalescing — const items = data ?? []. Supabase returns null when there are no rows.
-2. Array methods: Never call on a value that could be null/undefined/non-array. Guard with (items ?? []).map(...) or Array.isArray(items) ? items.map(...) : [].
-3. React useState for arrays/objects: Initialize with correct type — useState<Type[]>([]) for arrays; avoid useState() or useState(null).
+2. Array methods: Never call on a value that could be null/undefined/non-array. Guard:
+   - (items ?? []).map(...) or Array.isArray(items) ? items.map(...) : []
+3. React useState for arrays/objects: Initialize properly — useState<Type[]>([]).
 4. API response shapes: Validate — const list = Array.isArray(response?.data) ? response.data : [].
-5. Optional chaining: Use obj?.property?.nested when traversing API responses or DB results.
+5. Optional chaining: Use obj?.property?.nested when accessing nested API responses.
 6. Destructuring with defaults: const { items = [], count = 0 } = response ?? {}.
 
 ---
 
-This prompt ensures a cohesive, production-ready implementation plan for the Generate Analysis page, the AI Analysis Engine, the Notifications & Emails subsystem, and the Company Detail workspace, with strict runtime safety, dependency-first sequencing, and a unified acceptance checklist. Use this as a blueprint for the AI development tool to generate concrete code, schemas, APIs, and UI components.
+If clustered scope items exist in PROJECT CONTEXT, implement them in one cohesive batch with clear subsections per clustered item (page/feature/schema) and provide one combined acceptance checklist to minimize duplication. This prompt is designed to be directly consumable by an AI development tool to scaffold, implement, test, and verify Admin - User Management with a strong emphasis on runtime safety and dependency-first implementation order.
 
 ## Implementation Notes
 
