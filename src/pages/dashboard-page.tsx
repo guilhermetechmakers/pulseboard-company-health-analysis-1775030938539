@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { BarChart3, FileSpreadsheet, Plug, Sparkles } from 'lucide-react'
+import { BarChart3, FileDown, FileSpreadsheet, Plug, Sparkles } from 'lucide-react'
 import { differenceInHours, parseISO } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -121,6 +121,14 @@ export function DashboardPage() {
               Import CSV
             </Link>
           </Button>
+          {agg?.latestReport?.id ? (
+            <Button asChild variant="secondary" className="gap-2 transition-all duration-200 hover:scale-[1.02]">
+              <Link to={`/export/${agg.latestReport.id}`}>
+                <FileDown className="h-4 w-4" />
+                Export report
+              </Link>
+            </Button>
+          ) : null}
         </div>
       </div>
 

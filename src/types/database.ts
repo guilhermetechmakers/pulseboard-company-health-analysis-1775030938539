@@ -334,6 +334,28 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['company_billing']['Insert']>
         Relationships: []
       }
+      company_branding: {
+        Row: {
+          company_id: string
+          logo_storage_path: string | null
+          primary_color: string
+          secondary_color: string
+          font_family: string
+          export_preferences: Record<string, unknown>
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          logo_storage_path?: string | null
+          primary_color?: string
+          secondary_color?: string
+          font_family?: string
+          export_preferences?: Record<string, unknown>
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['company_branding']['Insert']>
+        Relationships: []
+      }
       company_market_data: {
         Row: {
           company_id: string
@@ -402,6 +424,54 @@ export interface Database {
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['audit_logs']['Insert']>
+        Relationships: []
+      }
+      asset_links: {
+        Row: {
+          id: string
+          company_id: string
+          type: string
+          url: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          type?: string
+          url: string
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['asset_links']['Insert']>
+        Relationships: []
+      }
+      export_jobs: {
+        Row: {
+          id: string
+          company_id: string
+          report_id: string
+          initiated_by: string | null
+          status: string
+          progress: number
+          export_params: Record<string, unknown>
+          storage_path: string | null
+          error_message: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          report_id: string
+          initiated_by?: string | null
+          status?: string
+          progress?: number
+          export_params?: Record<string, unknown>
+          storage_path?: string | null
+          error_message?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['export_jobs']['Insert']>
         Relationships: []
       }
       profiles: {

@@ -64,4 +64,8 @@ export const api = {
 }
 
 /** Prefer `@/lib/supabase-functions` for authenticated Edge Function calls (native fetch + session). */
-export { invokeAnalyzeCompanyHealth } from '@/lib/supabase-functions'
+export {
+  invokeAnalyzeCompanyHealth,
+  invokeReportExport,
+  invokeExportDownloadUrl,
+} from '@/lib/supabase-functions'

@@ -99,7 +99,7 @@ export function ReportViewerPage() {
       title="Report viewer"
       description={`Analysis ${report.status} · ${report.analysis_depth ?? 'standard'} · ${new Date(report.created_at).toLocaleString()}`}
     >
-      <div className="mb-6 flex flex-wrap gap-2">
+      <div className="mb-6 flex flex-wrap gap-2 no-print">
         <Button
           type="button"
           variant="secondary"
@@ -140,9 +140,12 @@ export function ReportViewerPage() {
             PDF settings
           </Button>
         </Link>
+        <Button type="button" variant="secondary" onClick={() => window.print()}>
+          Print layout
+        </Button>
       </div>
 
-      <Tabs defaultValue="sections">
+      <Tabs defaultValue="sections" className="no-print">
         <TabsList>
           <TabsTrigger value="sections">Sections</TabsTrigger>
           <TabsTrigger value="swot">SWOT</TabsTrigger>
@@ -155,6 +158,7 @@ export function ReportViewerPage() {
             title="Executive summary"
             value={exec}
             isSaving={updateReport.isPending}
+            autoSaveDebounceMs={1600}
             onSave={async (next) => {
               await updateReport.mutateAsync({ reportId: report.id, patch: { executive_summary: next } })
             }}
@@ -163,6 +167,7 @@ export function ReportViewerPage() {
             title="Financial analysis"
             value={fin}
             isSaving={updateReport.isPending}
+            autoSaveDebounceMs={1600}
             onSave={async (next) => {
               await updateReport.mutateAsync({ reportId: report.id, patch: { financial_analysis: next } })
             }}
@@ -171,6 +176,7 @@ export function ReportViewerPage() {
             title="Market analysis"
             value={market}
             isSaving={updateReport.isPending}
+            autoSaveDebounceMs={1600}
             onSave={async (next) => {
               await updateReport.mutateAsync({ reportId: report.id, patch: { market_analysis: next } })
             }}
@@ -179,6 +185,7 @@ export function ReportViewerPage() {
             title="Social & brand analysis"
             value={social}
             isSaving={updateReport.isPending}
+            autoSaveDebounceMs={1600}
             onSave={async (next) => {
               await updateReport.mutateAsync({ reportId: report.id, patch: { social_analysis: next } })
             }}
@@ -269,7 +276,21 @@ export function ReportViewerPage() {
         </TabsContent>
       </Tabs>
 
-      <Card className="mt-8 p-4">
+      <Card className="print-report-root mt-8 hidden p-4 print:block">
+        <div className="prose prose-sm max-w-none dark:prose-invert">
+          <h2 className="text-foreground">Print-ready summary</h2>
+          <h3>Executive summary</h3>
+          <p className="whitespace-pre-wrap text-muted-foreground">{exec || '—'}</p>
+          <h3>Financial</h3>
+          <p className="whitespace-pre-wrap text-muted-foreground">{fin || '—'}</p>
+          <h3>Market</h3>
+          <p className="whitespace-pre-wrap text-muted-foreground">{market || '—'}</p>
+          <h3>Social &amp; brand</h3>
+          <p className="whitespace-pre-wrap text-muted-foreground">{social || '—'}</p>
+        </div>
+      </Card>
+
+      <Card className="mt-8 p-4 no-print">
         <button
           type="button"
           className="flex w-full items-center justify-between text-left text-sm font-semibold"

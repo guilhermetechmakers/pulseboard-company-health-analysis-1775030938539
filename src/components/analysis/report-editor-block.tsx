@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -10,15 +10,35 @@ interface ReportEditorBlockProps {
   onSave: (next: string) => void | Promise<void>
   isSaving?: boolean
   className?: string
+  /** When set and the block is being edited, saves automatically after the user pauses typing. */
+  autoSaveDebounceMs?: number
 }
 
-export function ReportEditorBlock({ title, value, onSave, isSaving, className }: ReportEditorBlockProps) {
+export function ReportEditorBlock({
+  title,
+  value,
+  onSave,
+  isSaving,
+  className,
+  autoSaveDebounceMs,
+}: ReportEditorBlockProps) {
   const [draft, setDraft] = useState(value)
   const [editing, setEditing] = useState(false)
+  const onSaveRef = useRef(onSave)
+  onSaveRef.current = onSave
 
   useEffect(() => {
     setDraft(value)
   }, [value])
+
+  useEffect(() => {
+    if (!editing || autoSaveDebounceMs == null) return
+    if (draft === value) return
+    const timer = window.setTimeout(() => {
+      void onSaveRef.current(draft)
+    }, autoSaveDebounceMs)
+    return () => window.clearTimeout(timer)
+  }, [draft, editing, autoSaveDebounceMs, value])
 
   return (
     <Card className={cn('space-y-3 p-4 transition-all duration-200 hover:shadow-card', className)}>

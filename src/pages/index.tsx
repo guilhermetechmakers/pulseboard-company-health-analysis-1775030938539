@@ -10,6 +10,7 @@ import { SettingsPage } from '@/pages/settings-page'
 export { DashboardPage, CompanyDetailPage, SettingsPage }
 export { GenerateAnalysisPage } from '@/pages/generate-analysis-page'
 export { ReportViewerPage } from '@/pages/report-viewer-page'
+export { ExportSettingsPage } from '@/pages/export-settings-page'
 export { LoginPage } from '@/pages/login-page'
 export { SignupPage } from '@/pages/signup-page'
 export { VerifyEmailPage } from '@/pages/verify-email-page'
@@ -61,10 +62,6 @@ export const MarketDataPage = () => (
 )
 export const SocialBrandPage = () => (
   <PageTemplate title="Social & brand form" description="Channel metrics, engagement cadence, website traffic, and ratings." />
-)
-
-export const ExportSettingsPage = () => (
-  <PageTemplate title="Export and PDF settings" description="Configure section visibility, branding options, and export orientation." />
 )
 
 export const AdminUsersPage = () => (
