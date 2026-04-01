@@ -7,6 +7,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from 'https://esm.sh/zod@3.23.8'
 import { corsHeaders } from '../_shared/cors.ts'
+import { rejectIfActiveCompanyHeaderMismatch } from '../_shared/company-scope-headers.ts'
 import {
   ttlCacheDeleteKey,
   ttlCacheDeletePrefix,
@@ -139,6 +140,15 @@ serve(async (req) => {
     }
 
     const body = parsed.data
+
+    const scopeCompanyFromBody =
+      'companyId' in body && typeof (body as { companyId?: unknown }).companyId === 'string'
+        ? (body as { companyId: string }).companyId
+        : null
+    if (scopeCompanyFromBody) {
+      const scopeBlock = rejectIfActiveCompanyHeaderMismatch(req, scopeCompanyFromBody)
+      if (scopeBlock) return scopeBlock
+    }
 
     if (body.op === 'cache_stats') {
       return new Response(
@@ -308,6 +318,9 @@ serve(async (req) => {
       const companyId = report.company_id as string
       const ok = await assertCompanyAccess(supabase, user.id, companyId)
       if (!ok) return errorResponse('Access denied', 403)
+
+      const reportScope = rejectIfActiveCompanyHeaderMismatch(req, companyId)
+      if (reportScope) return reportScope
 
       const cacheKey = `analysis:${body.reportId}:summary`
       if (!body.bustCache) {

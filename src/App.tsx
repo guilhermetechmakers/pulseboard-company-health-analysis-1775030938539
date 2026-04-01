@@ -4,7 +4,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import { AppShell } from '@/components/layout/app-shell'
 import { AuthProvider } from '@/contexts/auth-context'
+import { ActiveCompanyProvider } from '@/contexts/active-company-context'
 import { ProtectedRoute } from '@/components/auth/protected-route'
+import { RequireCompanyRoute } from '@/components/auth/require-company-route'
 import {
   LandingPage,
   SignupPage,
@@ -32,6 +34,7 @@ import {
   DataImportPage,
   DataExportPage,
   SearchPage,
+  SingleCompanyBlockedPage,
 } from '@/pages'
 import { AdminOnlyRoute } from '@/components/auth/admin-only-route'
 import { AdminLayout } from '@/components/layout/admin-layout'
@@ -52,63 +55,76 @@ function Guard({ children }: { children: ReactNode }) {
   return <ProtectedRoute>{children}</ProtectedRoute>
 }
 
+/** Authenticated routes that need a `companies` row (single-company workspace). */
+function Workspace({ children }: { children: ReactNode }) {
+  return (
+    <Guard>
+      <RequireCompanyRoute>{children}</RequireCompanyRoute>
+    </Guard>
+  )
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter>
           <GlobalErrorBoundary>
-            <AppShell>
-            <Routes>
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/signup" element={<SignupPage />} />
-              <Route path="/verify-email" element={<VerifyEmailPage />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/password-reset" element={<PasswordResetRequestPage />} />
-              <Route path="/password-reset/confirm" element={<PasswordResetConfirmPage />} />
-              <Route path="/password-reset/:token" element={<PasswordResetConfirmPage />} />
-              <Route path="/reset-password" element={<Navigate to="/password-reset" replace />} />
+            <ActiveCompanyProvider>
+              <AppShell>
+                <Routes>
+                  <Route path="/" element={<LandingPage />} />
+                  <Route path="/signup" element={<SignupPage />} />
+                  <Route path="/verify-email" element={<VerifyEmailPage />} />
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route path="/password-reset" element={<PasswordResetRequestPage />} />
+                  <Route path="/password-reset/confirm" element={<PasswordResetConfirmPage />} />
+                  <Route path="/password-reset/:token" element={<PasswordResetConfirmPage />} />
+                  <Route path="/reset-password" element={<Navigate to="/password-reset" replace />} />
 
-              <Route path="/dashboard" element={<Guard><DashboardPage /></Guard>} />
-              <Route path="/dashboard/overview" element={<Guard><DashboardPage /></Guard>} />
-              <Route path="/dashboard/analytics" element={<Guard><CompanyDetailPage /></Guard>} />
-              <Route path="/dashboard/settings" element={<Guard><SettingsPage /></Guard>} />
-              <Route path="/dashboard/users" element={<Guard><Navigate to="/admin/users" replace /></Guard>} />
-              <Route path="/dashboard/projects" element={<Guard><CreateCompanyPage /></Guard>} />
-              <Route path="/company/create" element={<Guard><CreateCompanyPage /></Guard>} />
-              <Route path="/company" element={<Guard><CompanyDetailPage /></Guard>} />
-              <Route path="/financials" element={<Guard><FinancialsPage /></Guard>} />
-              <Route path="/market" element={<Guard><MarketDataPage /></Guard>} />
-              <Route path="/social-brand" element={<Guard><SocialBrandPage /></Guard>} />
-              <Route path="/analysis/generate" element={<Guard><GenerateAnalysisPage /></Guard>} />
-              <Route path="/generate" element={<Guard><GenerateAnalysisPage /></Guard>} />
-              <Route path="/report/:id" element={<Guard><ReportViewerPage /></Guard>} />
-              <Route path="/reports/:reportId" element={<Guard><ReportViewerPage /></Guard>} />
-              <Route path="/export/:id" element={<Guard><ExportSettingsPage /></Guard>} />
-              <Route path="/profile" element={<Guard><UserProfilePage /></Guard>} />
-              <Route path="/settings" element={<Guard><SettingsPage /></Guard>} />
-              <Route path="/data/import" element={<Guard><DataImportPage /></Guard>} />
-              <Route path="/data/export" element={<Guard><DataExportPage /></Guard>} />
-              <Route path="/search" element={<Guard><SearchPage /></Guard>} />
-              <Route path="/notifications" element={<Guard><NotificationsPage /></Guard>} />
-              <Route
-                path="/admin"
-                element={
-                  <Guard>
-                    <AdminOnlyRoute>
-                      <AdminLayout />
-                    </AdminOnlyRoute>
-                  </Guard>
-                }
-              >
-                <Route index element={<AdminDashboardPage />} />
-                <Route path="users" element={<AdminUsersPage />} />
-                <Route path="audit-logs" element={<AdminAuditLogsPage />} />
-                <Route path="company-consolidation" element={<AdminCompanyConsolidationPage />} />
-              </Route>
-              <Route path="*" element={<NotFoundPage />} />
-            </Routes>
-            </AppShell>
+                  <Route path="/dashboard" element={<Workspace><DashboardPage /></Workspace>} />
+                  <Route path="/dashboard/overview" element={<Workspace><DashboardPage /></Workspace>} />
+                  <Route path="/dashboard/analytics" element={<Workspace><CompanyDetailPage /></Workspace>} />
+                  <Route path="/dashboard/settings" element={<Workspace><SettingsPage /></Workspace>} />
+                  <Route path="/dashboard/users" element={<Guard><Navigate to="/admin/users" replace /></Guard>} />
+                  <Route path="/dashboard/projects" element={<Guard><CreateCompanyPage /></Guard>} />
+                  <Route path="/company/create" element={<Guard><CreateCompanyPage /></Guard>} />
+                  <Route path="/company/scope-notice" element={<Guard><SingleCompanyBlockedPage /></Guard>} />
+                  <Route path="/workspace/blocked" element={<Guard><SingleCompanyBlockedPage /></Guard>} />
+                  <Route path="/company" element={<Workspace><CompanyDetailPage /></Workspace>} />
+                  <Route path="/financials" element={<Workspace><FinancialsPage /></Workspace>} />
+                  <Route path="/market" element={<Workspace><MarketDataPage /></Workspace>} />
+                  <Route path="/social-brand" element={<Workspace><SocialBrandPage /></Workspace>} />
+                  <Route path="/analysis/generate" element={<Workspace><GenerateAnalysisPage /></Workspace>} />
+                  <Route path="/generate" element={<Workspace><GenerateAnalysisPage /></Workspace>} />
+                  <Route path="/report/:id" element={<Workspace><ReportViewerPage /></Workspace>} />
+                  <Route path="/reports/:reportId" element={<Workspace><ReportViewerPage /></Workspace>} />
+                  <Route path="/export/:id" element={<Workspace><ExportSettingsPage /></Workspace>} />
+                  <Route path="/profile" element={<Guard><UserProfilePage /></Guard>} />
+                  <Route path="/settings" element={<Workspace><SettingsPage /></Workspace>} />
+                  <Route path="/data/import" element={<Workspace><DataImportPage /></Workspace>} />
+                  <Route path="/data/export" element={<Workspace><DataExportPage /></Workspace>} />
+                  <Route path="/search" element={<Workspace><SearchPage /></Workspace>} />
+                  <Route path="/notifications" element={<Workspace><NotificationsPage /></Workspace>} />
+                  <Route
+                    path="/admin"
+                    element={
+                      <Guard>
+                        <AdminOnlyRoute>
+                          <AdminLayout />
+                        </AdminOnlyRoute>
+                      </Guard>
+                    }
+                  >
+                    <Route index element={<AdminDashboardPage />} />
+                    <Route path="users" element={<AdminUsersPage />} />
+                    <Route path="audit-logs" element={<AdminAuditLogsPage />} />
+                    <Route path="company-consolidation" element={<AdminCompanyConsolidationPage />} />
+                  </Route>
+                  <Route path="*" element={<NotFoundPage />} />
+                </Routes>
+              </AppShell>
+            </ActiveCompanyProvider>
           </GlobalErrorBoundary>
         </BrowserRouter>
       </AuthProvider>

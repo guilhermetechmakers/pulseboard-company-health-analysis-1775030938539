@@ -1,4 +1,8 @@
+import { readStoredActiveCompanyId } from '@/lib/active-company-storage'
 import { supabase } from '@/lib/supabase'
+
+const ACTIVE_COMPANY_HEADER = 'X-Active-Company-Id'
+const LEGACY_ACTIVE_COMPANY_HEADER = 'X-PulseBoard-Active-Company-Id'
 
 export class ApiError extends Error {
   status?: number
@@ -26,6 +30,12 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
     if (token) {
       headers.Authorization = `Bearer ${token}`
     }
+  }
+
+  const activeCompanyId = readStoredActiveCompanyId()
+  if (activeCompanyId) {
+    headers[ACTIVE_COMPANY_HEADER] = activeCompanyId
+    headers[LEGACY_ACTIVE_COMPANY_HEADER] = activeCompanyId
   }
 
   return headers
@@ -76,6 +86,7 @@ export {
   invokePulseDataIo,
   invokePulseCompanyApi,
   invokePulseCompaniesApi,
+  invokePulseActiveCompany,
   pulseDataIoImportCsv,
   pulseDataIoImportStatus,
   pulseDataIoExportCsv,

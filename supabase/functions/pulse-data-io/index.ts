@@ -5,6 +5,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
+import { rejectIfActiveCompanyHeaderMismatch } from '../_shared/company-scope-headers.ts'
 import { pickNumber } from '../_shared/safe-json.ts'
 
 function json(data: unknown, status = 200) {
@@ -122,6 +123,9 @@ serve(async (req) => {
       const mapping = asRecord(body.mapping)
 
       if (!companyId || !csvText) return json({ error: 'companyId and csvText required' }, 400)
+
+      const importScope = rejectIfActiveCompanyHeaderMismatch(req, companyId)
+      if (importScope) return importScope
 
       const { data: company, error: cErr } = await userClient
         .from('companies')
@@ -384,6 +388,9 @@ serve(async (req) => {
         typeof body.scheduleCadence === 'string' ? body.scheduleCadence : null
 
       if (!companyId) return json({ error: 'companyId required' }, 400)
+
+      const exportScope = rejectIfActiveCompanyHeaderMismatch(req, companyId)
+      if (exportScope) return exportScope
 
       const { data: company, error: cErr } = await userClient
         .from('companies')

@@ -1,5 +1,6 @@
 import type { Session, User } from '@supabase/supabase-js'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { clearActiveCompanyPersistence } from '@/lib/active-company-storage'
 import { supabase } from '@/lib/supabase'
 
 type AuthContextValue = {
@@ -49,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     if (supabase) await supabase.auth.signOut()
+    clearActiveCompanyPersistence()
     setSession(null)
     setUser(null)
   }, [])

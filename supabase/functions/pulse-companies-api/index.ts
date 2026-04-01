@@ -128,6 +128,100 @@ async function logAudit(
   }
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function isUuid(s: string): boolean {
+  return UUID_RE.test(s)
+}
+
+/** Canonical `X-Active-Company-Id` plus legacy `X-PulseBoard-Active-Company-Id` from `buildAuthenticatedEdgeHeaders`. */
+function readScopeHeader(req: Request): string | null {
+  const raw =
+    req.headers.get('x-active-company-id') ?? req.headers.get('x-pulseboard-active-company-id') ?? ''
+  const h = typeof raw === 'string' ? raw.trim() : ''
+  if (!h || !isUuid(h)) return null
+  return h
+}
+
+type ScopeResult =
+  | { ok: true; companyId: string | null; companyIds: string[]; hasMultipleCompanies: boolean }
+  | { ok: false; response: Response }
+
+/**
+ * Resolves which company row APIs should touch: single-company accounts default to their only id;
+ * legacy duplicates require a valid header or `profiles.last_context_company_id`.
+ */
+async function resolveScopedCompanyId(
+  admin: ReturnType<typeof createClient>,
+  userId: string,
+  headerId: string | null,
+): Promise<ScopeResult> {
+  const { data: rows, error } = await admin
+    .from('companies')
+    .select('id, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true })
+  if (error) {
+    return {
+      ok: false,
+      response: json({ error: { code: 'SCOPE_LOOKUP_FAILED', message: error.message } }, 500),
+    }
+  }
+  const list = Array.isArray(rows) ? rows : []
+  const ids = list
+    .map((r) => (isRecord(r) && typeof r.id === 'string' ? r.id : ''))
+    .filter((x) => x.length > 0)
+  if (ids.length === 0) {
+    return { ok: true, companyId: null, companyIds: [], hasMultipleCompanies: false }
+  }
+
+  const { data: prof } = await admin.from('profiles').select('last_context_company_id').eq('id', userId).maybeSingle()
+  const ctxRaw = prof && isRecord(prof) ? prof.last_context_company_id : null
+  const ctx = typeof ctxRaw === 'string' && ids.includes(ctxRaw) ? ctxRaw : null
+
+  if (ids.length === 1) {
+    const only = ids[0]
+    if (headerId && headerId !== only) {
+      return {
+        ok: false,
+        response: json(
+          {
+            error: {
+              code: 'CROSS_COMPANY_SCOPE',
+              message: 'The active company header does not match your workspace.',
+              remediation: 'Refresh PulseBoard or sign out and back in. Only one company is allowed per account.',
+            },
+          },
+          403,
+        ),
+      }
+    }
+    return { ok: true, companyId: only, companyIds: ids, hasMultipleCompanies: false }
+  }
+
+  if (headerId) {
+    if (!ids.includes(headerId)) {
+      return {
+        ok: false,
+        response: json(
+          {
+            error: {
+              code: 'CROSS_COMPANY_SCOPE',
+              message: 'That company id is not associated with your account.',
+              remediation: 'Ask an admin to consolidate duplicate companies or pick a valid workspace id.',
+            },
+          },
+          403,
+        ),
+      }
+    }
+    return { ok: true, companyId: headerId, companyIds: ids, hasMultipleCompanies: true }
+  }
+
+  const picked = ctx ?? ids[0] ?? null
+  return { ok: true, companyId: picked, companyIds: ids, hasMultipleCompanies: true }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -188,6 +282,60 @@ serve(async (req) => {
     if (!u.ok) return u.response
     const draft = isRecord(body.draft) ? body.draft : {}
     return json({ data: computeCompletenessFromPayload(draft) })
+  }
+
+  if (op === 'resolve_active_company') {
+    const u = await requireUser(supabaseUrl, anon, authHeader)
+    if (!u.ok) return u.response
+    const scopeHeader = readScopeHeader(req)
+    const scope = await resolveScopedCompanyId(admin, u.userId, scopeHeader)
+    if (!scope.ok) return scope.response
+    let companyName: string | null = null
+    if (scope.companyId) {
+      const { data: row } = await admin.from('companies').select('name').eq('id', scope.companyId).maybeSingle()
+      companyName = row && isRecord(row) && typeof row.name === 'string' ? row.name : null
+    }
+    return json({
+      data: {
+        activeCompanyId: scope.companyId,
+        companyName,
+        hasMultipleCompanies: scope.hasMultipleCompanies,
+        singleCompanyMode: true,
+      },
+    })
+  }
+
+  if (op === 'context_sync') {
+    const u = await requireUser(supabaseUrl, anon, authHeader)
+    if (!u.ok) return u.response
+    const cidRaw = typeof body.companyId === 'string' ? body.companyId.trim() : ''
+    if (!cidRaw || !isUuid(cidRaw)) {
+      return json({ error: { code: 'VALIDATION', message: 'companyId (UUID) is required' } }, 422)
+    }
+    const { data: own } = await admin
+      .from('companies')
+      .select('id')
+      .eq('id', cidRaw)
+      .eq('user_id', u.userId)
+      .maybeSingle()
+    if (!own || !isRecord(own) || typeof own.id !== 'string') {
+      return json(
+        {
+          error: {
+            code: 'FORBIDDEN',
+            message: 'Company not found for this user',
+            remediation: 'Use a company id you own, or finish onboarding.',
+          },
+        },
+        403,
+      )
+    }
+    const { error: pErr } = await admin
+      .from('profiles')
+      .update({ last_context_company_id: cidRaw, updated_at: new Date().toISOString() })
+      .eq('id', u.userId)
+    if (pErr) return json({ error: { code: 'PROFILE_UPDATE_FAILED', message: pErr.message } }, 500)
+    return json({ data: { ok: true, lastContextCompanyId: cidRaw } })
   }
 
   if (op === 'create') {
@@ -305,7 +453,18 @@ serve(async (req) => {
   if (op === 'me_get') {
     const u = await requireUser(supabaseUrl, anon, authHeader)
     if (!u.ok) return u.response
-    const { data, error } = await admin.from('companies').select('*').eq('user_id', u.userId).maybeSingle()
+    const scopeHeader = readScopeHeader(req)
+    const scope = await resolveScopedCompanyId(admin, u.userId, scopeHeader)
+    if (!scope.ok) return scope.response
+    if (!scope.companyId) {
+      return json({ data: { company: null } })
+    }
+    const { data, error } = await admin
+      .from('companies')
+      .select('*')
+      .eq('id', scope.companyId)
+      .eq('user_id', u.userId)
+      .maybeSingle()
     if (error) return json({ error: error.message }, 500)
     return json({ data: { company: data ?? null } })
   }
@@ -313,8 +472,13 @@ serve(async (req) => {
   if (op === 'me_patch') {
     const u = await requireUser(supabaseUrl, anon, authHeader)
     if (!u.ok) return u.response
-    const { data: row } = await admin.from('companies').select('id').eq('user_id', u.userId).maybeSingle()
-    if (!row?.id) return json({ error: { code: 'NOT_FOUND', message: 'No company for user' } }, 404)
+    const scopeHeader = readScopeHeader(req)
+    const scope = await resolveScopedCompanyId(admin, u.userId, scopeHeader)
+    if (!scope.ok) return scope.response
+    if (!scope.companyId) {
+      return json({ error: { code: 'NOT_FOUND', message: 'No company for user' } }, 404)
+    }
+    const row = { id: scope.companyId }
     const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
     if (typeof body.name === 'string') patch.name = body.name
     if (typeof body.industry === 'string') patch.industry = body.industry || null
@@ -347,8 +511,13 @@ serve(async (req) => {
   if (op === 'me_delete') {
     const u = await requireUser(supabaseUrl, anon, authHeader)
     if (!u.ok) return u.response
-    const { data: row } = await admin.from('companies').select('id').eq('user_id', u.userId).maybeSingle()
-    if (!row?.id) return json({ error: { code: 'NOT_FOUND', message: 'No company to delete' } }, 404)
+    const scopeHeader = readScopeHeader(req)
+    const scope = await resolveScopedCompanyId(admin, u.userId, scopeHeader)
+    if (!scope.ok) return scope.response
+    if (!scope.companyId) {
+      return json({ error: { code: 'NOT_FOUND', message: 'No company to delete' } }, 404)
+    }
+    const row = { id: scope.companyId }
     const { error } = await admin.from('companies').delete().eq('id', row.id)
     if (error) return json({ error: error.message }, 500)
     await admin.from('onboarding_drafts').delete().eq('user_id', u.userId)

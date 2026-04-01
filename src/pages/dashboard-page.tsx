@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { BarChart3, FileDown, FileSpreadsheet, Plug, Sparkles } from 'lucide-react'
 import { differenceInHours, format, parseISO } from 'date-fns'
 import { Button } from '@/components/ui/button'
@@ -91,10 +91,6 @@ export function DashboardPage() {
     label: s.label,
     score: s.value,
   }))
-
-  if (!companyLoading && !company) {
-    return <Navigate to="/company/create" replace />
-  }
 
   return (
     <section className="space-y-8 animate-fade-in-up">

@@ -79,3 +79,15 @@ export async function adminMergeCompanies(input: {
     dryRun: input.dryRun === true,
   })
 }
+
+/** Sets `profiles.last_context_company_id` for the target user (admin only). */
+export async function adminSetPrimaryCompany(input: {
+  targetUserId: string
+  companyId: string
+}): Promise<Record<string, unknown>> {
+  return invokeAdminApi({
+    action: 'user_set_primary_company',
+    targetUserId: input.targetUserId,
+    companyId: input.companyId,
+  })
+}

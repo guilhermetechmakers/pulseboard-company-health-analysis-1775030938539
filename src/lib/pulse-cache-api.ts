@@ -1,3 +1,4 @@
+import { buildAuthenticatedEdgeHeaders } from '@/lib/pulseboard-request-headers'
 import { supabase } from '@/lib/supabase'
 import {
   clientCacheDel,
@@ -77,11 +78,8 @@ export async function invokePulseCacheApi<T>(body: PulseCacheRequest): Promise<P
     return { data: null, error: 'Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY', meta: null }
   }
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  if (!session?.access_token) {
+  const headers = await buildAuthenticatedEdgeHeaders()
+  if (!headers.Authorization?.startsWith('Bearer ')) {
     return { data: null, error: 'Sign in required', meta: null }
   }
 
@@ -99,11 +97,7 @@ export async function invokePulseCacheApi<T>(body: PulseCacheRequest): Promise<P
 
   const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/pulse-cache-api`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: anon,
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify(body),
   })
 

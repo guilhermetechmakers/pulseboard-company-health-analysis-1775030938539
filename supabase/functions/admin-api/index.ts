@@ -23,6 +23,7 @@ type AdminAction =
   | 'companies_multi_list'
   | 'companies_merge'
   | 'companies_migrate_dry_run'
+  | 'user_set_primary_company'
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -936,6 +937,58 @@ serve(async (req) => {
       return json({ data: { dryRun: true, preview } })
     }
 
+    if (action === 'user_set_primary_company') {
+      const targetUserId = str(body.targetUserId)
+      const companyId = str(body.companyId)
+      if (!targetUserId || !companyId || !isUuid(targetUserId) || !isUuid(companyId)) {
+        return json(
+          {
+            error: 'Invalid payload',
+            code: 'VALIDATION_ERROR',
+            remediation: 'Provide targetUserId and companyId as UUIDs.',
+          },
+          422,
+        )
+      }
+      const { data: co, error: cErr } = await supabaseAdmin
+        .from('companies')
+        .select('id, user_id')
+        .eq('id', companyId)
+        .maybeSingle()
+      if (cErr) throw new Error(cErr.message)
+      const owner = co && isRecord(co) ? (typeof co.user_id === 'string' ? co.user_id : '') : ''
+      if (!owner || owner !== targetUserId) {
+        return json(
+          {
+            error: 'Company does not belong to target user',
+            code: 'FORBIDDEN_PRIMARY',
+            remediation: 'Pick a company row whose user_id matches targetUserId.',
+          },
+          403,
+        )
+      }
+      const { error: uErr } = await supabaseAdmin
+        .from('profiles')
+        .update({ last_context_company_id: companyId, updated_at: new Date().toISOString() })
+        .eq('id', targetUserId)
+      if (uErr) throw new Error(uErr.message)
+      await supabaseAdmin.from('audit_logs').insert({
+        actor_user_id: adminId,
+        action: 'admin_set_primary_company',
+        entity: 'profile',
+        entity_id: targetUserId,
+        metadata: { companyId, targetUserId },
+        notes: 'Admin assigned primary / active company context for single-company mode resolution',
+      })
+      await supabaseAdmin.from('admin_actions').insert({
+        admin_id: adminId,
+        action: 'user_set_primary_company',
+        target_user_id: targetUserId,
+        metadata: { companyId },
+      })
+      return json({ data: { ok: true, targetUserId, primaryCompanyId: companyId } })
+    }
+
     if (action === 'companies_merge') {
       const sourceId = str(body.sourceCompanyId)
       const targetId = str(body.targetCompanyId)
@@ -1072,6 +1125,7 @@ serve(async (req) => {
         'companies_multi_list',
         'companies_merge',
         'companies_migrate_dry_run',
+        'user_set_primary_company',
       ],
     }, 400)
   } catch (e) {

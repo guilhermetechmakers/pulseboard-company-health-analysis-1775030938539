@@ -6,6 +6,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from 'https://esm.sh/zod@3.23.8'
 import { corsHeaders } from '../_shared/cors.ts'
+import { rejectIfActiveCompanyHeaderMismatch } from '../_shared/company-scope-headers.ts'
 import { asRecord } from '../_shared/safe-json.ts'
 import { createUserNotification } from '../_shared/pulse-notify.ts'
 import { sendTemplatedEmailIfEnabled } from '../_shared/transactional-email.ts'
@@ -167,6 +168,9 @@ serve(async (req) => {
 
     const reportRow = asRecord(report)
     const companyId = typeof reportRow.company_id === 'string' ? reportRow.company_id : ''
+
+    const scopeBlock = rejectIfActiveCompanyHeaderMismatch(req, companyId)
+    if (scopeBlock) return scopeBlock
 
     const { data: company, error: companyError } = await userClient
       .from('companies')

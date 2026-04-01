@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { GitMerge, ListTree, Radar } from 'lucide-react'
+import { GitMerge, ListTree, Radar, Pin } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -14,11 +14,14 @@ import {
   runAdminCompaniesMigrateDryRun,
   type AdminMultiCompanyUser,
 } from '@/api/admin'
+import { adminSetPrimaryCompany } from '@/api/admin-company-consolidation'
 
 export function AdminCompanyConsolidationPage() {
   const queryClient = useQueryClient()
   const [sourceId, setSourceId] = useState('')
   const [targetId, setTargetId] = useState('')
+  const [primaryUserId, setPrimaryUserId] = useState('')
+  const [primaryCompanyId, setPrimaryCompanyId] = useState('')
 
   const multiQuery = useQuery({
     queryKey: ['admin', 'companies-multi'],
@@ -45,6 +48,21 @@ export function AdminCompanyConsolidationPage() {
     onSuccess: (_, dryRun) => {
       toast.success(dryRun ? 'Merge preview OK' : 'Companies merged')
       void multiQuery.refetch()
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
+  const setPrimaryMutation = useMutation({
+    mutationFn: () =>
+      adminSetPrimaryCompany({
+        targetUserId: primaryUserId.trim(),
+        companyId: primaryCompanyId.trim(),
+      }),
+    onSuccess: () => {
+      toast.success('Primary company context updated')
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'audit'] })
+      void multiQuery.refetch()
+      void queryClient.invalidateQueries({ queryKey: ['company', 'mine'] })
     },
     onError: (e: Error) => toast.error(e.message),
   })
@@ -145,6 +163,52 @@ export function AdminCompanyConsolidationPage() {
             onClick={() => mergeMutation.mutate(false)}
           >
             Execute merge
+          </Button>
+        </div>
+      </Card>
+
+      <Card className="border-border/80 p-6 shadow-card">
+        <div className="flex items-center gap-2">
+          <Pin className="h-5 w-5 text-primary" aria-hidden />
+          <h3 className="font-semibold">Set primary company context</h3>
+        </div>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Updates <code className="rounded bg-muted px-1">profiles.last_context_company_id</code> when a user has legacy
+          duplicate company rows so Edge Functions resolve the same workspace as the client header.
+        </p>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="primary-user">Target user ID</Label>
+            <Input
+              id="primary-user"
+              value={primaryUserId}
+              onChange={(e) => setPrimaryUserId(e.target.value)}
+              placeholder="auth user uuid"
+              className="rounded-lg font-mono text-sm"
+              autoComplete="off"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="primary-company">Company ID (must belong to user)</Label>
+            <Input
+              id="primary-company"
+              value={primaryCompanyId}
+              onChange={(e) => setPrimaryCompanyId(e.target.value)}
+              placeholder="company uuid"
+              className="rounded-lg font-mono text-sm"
+              autoComplete="off"
+            />
+          </div>
+        </div>
+        <div className="mt-4">
+          <Button
+            type="button"
+            variant="primary"
+            className="min-h-[44px] transition-transform duration-200 hover:scale-[1.02]"
+            disabled={setPrimaryMutation.isPending || !primaryUserId.trim() || !primaryCompanyId.trim()}
+            onClick={() => setPrimaryMutation.mutate()}
+          >
+            Apply primary context
           </Button>
         </div>
       </Card>

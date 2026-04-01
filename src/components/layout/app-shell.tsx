@@ -1,10 +1,11 @@
 import type { PropsWithChildren } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { LayoutDashboard, FileText, LogIn, LogOut, UserRound } from 'lucide-react'
+import { LayoutDashboard, FileText, LogIn, LogOut, UserRound, Building2, Shuffle } from 'lucide-react'
 import { GlobalSearchBar } from '@/components/search/global-search-bar'
 import { useAuth } from '@/contexts/auth-context'
 import { useUserProfile } from '@/hooks/use-auth-profile'
 import { useMyCompany } from '@/hooks/use-my-company'
+import { ActiveCompanyBanner } from '@/components/layout/active-company-banner'
 import { Button } from '@/components/ui/button'
 import { NotificationBell } from '@/components/notifications/notification-bell'
 import { cn } from '@/lib/utils'
@@ -12,12 +13,12 @@ import { cn } from '@/lib/utils'
 const baseLinks = [
   { to: '/', label: 'Landing', end: true },
   { to: '/dashboard', label: 'Dashboard' },
-  { to: '/company', label: 'Company' },
+  { to: '/company', label: 'Workspace' },
   { to: '/settings', label: 'Integrations' },
   { to: '/data/import', label: 'Data import' },
   { to: '/data/export', label: 'Data export' },
   { to: '/search', label: 'Search' },
-  { to: '/company/create', label: 'Create Company' },
+  { to: '/company/create', label: 'Create company' },
   { to: '/analysis/generate', label: 'Generate Analysis' },
 ]
 
@@ -38,6 +39,15 @@ export function AppShell({ children }: PropsWithChildren) {
           <Link to="/" className="flex items-center gap-2 font-semibold transition-transform duration-200 hover:scale-[1.02]">
             <LayoutDashboard className="h-4 w-4 text-primary" aria-hidden />
             PulseBoard
+            {session && myCompany?.name ? (
+              <span
+                className="hidden max-w-[140px] truncate rounded-md border border-border bg-muted/60 px-2 py-0.5 text-xs font-normal text-muted-foreground sm:inline-flex sm:items-center sm:gap-1"
+                title="Active company (single-company mode)"
+              >
+                <Building2 className="h-3 w-3 shrink-0 text-primary" aria-hidden />
+                {myCompany.name}
+              </span>
+            ) : null}
           </Link>
           {session ? (
             <div className="order-last w-full md:order-none md:mx-4 md:max-w-md md:flex-1">
@@ -62,14 +72,29 @@ export function AppShell({ children }: PropsWithChildren) {
               Report
             </Link>
             {session && isAdmin ? (
-              <NavLink
-                to="/admin"
-                className={({ isActive }) =>
-                  cn('font-medium transition-colors hover:text-foreground', isActive ? 'text-primary' : 'text-muted-foreground')
-                }
-              >
-                Admin
-              </NavLink>
+              <>
+                <NavLink
+                  to="/admin"
+                  className={({ isActive }) =>
+                    cn('font-medium transition-colors hover:text-foreground', isActive ? 'text-primary' : 'text-muted-foreground')
+                  }
+                >
+                  Admin
+                </NavLink>
+                <NavLink
+                  to="/admin/company-consolidation"
+                  className={({ isActive }) =>
+                    cn(
+                      'inline-flex items-center gap-1 text-xs font-medium transition-colors hover:text-foreground',
+                      isActive ? 'text-primary' : 'text-muted-foreground',
+                    )
+                  }
+                  title="Admin: merge duplicates or align primary company context"
+                >
+                  <Shuffle className="h-3.5 w-3.5" aria-hidden />
+                  Switch / merge companies
+                </NavLink>
+              </>
             ) : null}
             {session ? (
               <>
@@ -106,6 +131,7 @@ export function AppShell({ children }: PropsWithChildren) {
             Supabase env vars are missing — auth and data features stay offline until configured.
           </div>
         ) : null}
+        {isConfigured && session ? <ActiveCompanyBanner /> : null}
       </header>
       <main className="mx-auto max-w-6xl animate-fade-in-up px-4 py-6 motion-reduce:animate-none">{children}</main>
     </div>

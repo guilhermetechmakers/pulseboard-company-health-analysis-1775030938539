@@ -1,3 +1,4 @@
+import { buildAuthenticatedEdgeHeaders } from '@/lib/pulseboard-request-headers'
 import { supabase } from '@/lib/supabase'
 
 export class PulseSearchError extends Error {
@@ -25,21 +26,14 @@ export async function invokePulseSearch<T>(body: Record<string, unknown>, signal
     throw new PulseSearchError('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY', 503)
   }
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  if (!session?.access_token) {
+  const headers = await buildAuthenticatedEdgeHeaders()
+  if (!headers.Authorization?.startsWith('Bearer ')) {
     throw new PulseSearchError('Sign in required', 401)
   }
 
   const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/pulse-search`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: anon,
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify(body),
     signal,
   })

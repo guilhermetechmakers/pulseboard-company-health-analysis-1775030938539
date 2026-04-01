@@ -58,6 +58,29 @@ export interface Database {
         }
         Relationships: []
       }
+      user_company_memberships: {
+        Row: {
+          id: string
+          user_id: string
+          company_id: string
+          role: string
+          is_primary: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          company_id: string
+          role?: string
+          is_primary?: boolean
+          created_at?: string
+        }
+        Update: {
+          role?: string
+          is_primary?: boolean
+        }
+        Relationships: []
+      }
       onboarding_drafts: {
         Row: {
           id: string
@@ -761,6 +784,7 @@ export interface Database {
           signup_origin: string | null
           privacy_consent_at: string | null
           last_context_company_id: string | null
+          single_company_mode: boolean
           failed_login_attempts: number
           locked_until: string | null
           created_at: string
@@ -777,6 +801,7 @@ export interface Database {
           signup_origin?: string | null
           privacy_consent_at?: string | null
           last_context_company_id?: string | null
+          single_company_mode?: boolean
           failed_login_attempts?: number
           locked_until?: string | null
           created_at?: string

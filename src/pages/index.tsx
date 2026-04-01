@@ -69,6 +69,7 @@ export { AdminDashboardPage } from '@/pages/admin-dashboard-page'
 export { AdminUsersPage } from '@/pages/admin-users-page'
 export { AdminAuditLogsPage } from '@/pages/admin-audit-logs-page'
 export { AdminCompanyConsolidationPage } from '@/pages/admin-company-consolidation-page'
+export { SingleCompanyBlockedPage } from '@/pages/single-company-blocked-page'
 
 export function NotFoundPage() {
   return (

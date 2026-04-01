@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, Navigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { PageTemplate } from '@/components/layout/page-template'
 import { Card } from '@/components/ui/card'
@@ -10,6 +10,7 @@ import { ReportViewerEditorBlock } from '@/components/analysis/report-viewer-edi
 import { SnapshotManager } from '@/components/analysis/snapshot-manager'
 import { CacheStatusBadge } from '@/components/cache/cache-status-badge'
 import { useCreateReportSnapshot, useReport, useReportSnapshots, useUpdateReportSections } from '@/hooks/use-analysis'
+import { useMyCompany } from '@/hooks/use-my-company'
 import { supabase } from '@/lib/supabase'
 
 function asStringArray(value: unknown): string[] {
@@ -29,6 +30,7 @@ function downloadText(filename: string, content: string, mime: string) {
 export function ReportViewerPage() {
   const { id, reportId: reportIdParam } = useParams()
   const reportId = id ?? reportIdParam
+  const { data: myCompany } = useMyCompany()
   const {
     data: report,
     isLoading,
@@ -105,6 +107,10 @@ export function ReportViewerPage() {
         </Link>
       </PageTemplate>
     )
+  }
+
+  if (myCompany?.id && report.company_id !== myCompany.id) {
+    return <Navigate to="/company/scope-notice?reason=report" replace />
   }
 
   const exec = report.executive_summary ?? ''

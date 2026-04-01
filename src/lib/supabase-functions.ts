@@ -1,3 +1,4 @@
+import { buildAuthenticatedEdgeHeaders } from '@/lib/pulseboard-request-headers'
 import { supabase } from '@/lib/supabase'
 import type { AnalyzeCompanyRequest } from '@/types/analysis'
 import type { ExportDownloadUrlResponseData, ReportExportResponseData } from '@/types/export'
@@ -49,21 +50,14 @@ export async function invokeComputeHealthScore(body: {
     throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
   }
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  if (!session?.access_token) {
+  const headers = await buildAuthenticatedEdgeHeaders()
+  if (!headers.Authorization?.startsWith('Bearer ')) {
     throw new Error('Sign in required')
   }
 
   const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/compute-health-score`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: anon,
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify(body),
   })
 
@@ -99,21 +93,14 @@ export async function invokeAnalyzeCompanyHealth(
     throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
   }
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  if (!session?.access_token) {
+  const headers = await buildAuthenticatedEdgeHeaders()
+  if (!headers.Authorization?.startsWith('Bearer ')) {
     throw new Error('Sign in required to run analysis')
   }
 
   const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/analyze-company-health`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: anon,
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify(body),
   })
 
@@ -149,17 +136,7 @@ export async function invokeAuthServerLog(body: AuthServerLogBody): Promise<void
   const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
   if (!url || !anon) return
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  const headers: Record<string, string> = {
-    apikey: anon,
-    'Content-Type': 'application/json',
-  }
-  if (session?.access_token) {
-    headers.Authorization = `Bearer ${session.access_token}`
-  }
+  const headers = await buildAuthenticatedEdgeHeaders()
 
   try {
     const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/auth-server-log`, {
@@ -198,21 +175,14 @@ export async function invokeReportExport(
     throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
   }
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  if (!session?.access_token) {
+  const headers = await buildAuthenticatedEdgeHeaders()
+  if (!headers.Authorization?.startsWith('Bearer ')) {
     throw new Error('Sign in required to export reports')
   }
 
   const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/report-export`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: anon,
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify(body),
   })
 
@@ -249,21 +219,14 @@ export async function invokeExportDownloadUrl(input: {
     throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
   }
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  if (!session?.access_token) {
+  const headers = await buildAuthenticatedEdgeHeaders()
+  if (!headers.Authorization?.startsWith('Bearer ')) {
     throw new Error('Sign in required')
   }
 
   const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/export-download-url`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: anon,
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify({ exportId: input.exportId, expiresIn: input.expiresIn ?? 3600 }),
   })
 
@@ -298,19 +261,13 @@ export async function invokeEmailSend(body: {
   if (!url || !anon) {
     throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
   }
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  if (!session?.access_token) {
+  const headers = await buildAuthenticatedEdgeHeaders()
+  if (!headers.Authorization?.startsWith('Bearer ')) {
     throw new Error('Sign in required')
   }
   const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/email-send`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: anon,
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify({ templateType: body.templateType, placeholders: body.placeholders ?? {} }),
   })
   const json = (await res.json()) as {
@@ -336,19 +293,13 @@ export async function invokeEmailRetry(outboundId: string): Promise<{ data: { ok
   if (!url || !anon) {
     throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
   }
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  if (!session?.access_token) {
+  const headers = await buildAuthenticatedEdgeHeaders()
+  if (!headers.Authorization?.startsWith('Bearer ')) {
     throw new Error('Sign in required')
   }
   const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/email-retry`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: anon,
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify({ outboundId }),
   })
   const json = (await res.json()) as { data?: { ok: boolean; dispatchId: string | null }; error?: unknown }
@@ -381,21 +332,14 @@ export async function invokeSendTransactionalEmail(
     throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
   }
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  if (!session?.access_token) {
+  const headers = await buildAuthenticatedEdgeHeaders()
+  if (!headers.Authorization?.startsWith('Bearer ')) {
     throw new Error('Sign in required')
   }
 
   const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/send-transactional-email`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: anon,
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify(body),
   })
 
@@ -424,19 +368,13 @@ export async function invokePulseCompanyApi(body: Record<string, unknown>): Prom
   if (!url || !anon) {
     throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
   }
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  if (!session?.access_token) {
+  const headers = await buildAuthenticatedEdgeHeaders()
+  if (!headers.Authorization?.startsWith('Bearer ')) {
     throw new Error('Sign in required')
   }
   const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/pulse-company-api`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: anon,
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify(body),
   })
   const json = (await res.json()) as Record<string, unknown>
@@ -463,19 +401,13 @@ export async function invokePulseCompaniesApi<T = unknown>(body: PulseCompaniesA
   if (!url || !anon) {
     throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
   }
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  if (!session?.access_token) {
+  const headers = await buildAuthenticatedEdgeHeaders()
+  if (!headers.Authorization?.startsWith('Bearer ')) {
     throw new Error('Sign in required')
   }
   const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/pulse-companies-api`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: anon,
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify(body),
   })
   const json = (await res.json()) as T & {
@@ -512,19 +444,13 @@ export async function invokeAdminApi(body: Record<string, unknown>): Promise<Rec
   if (!url || !anon) {
     throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
   }
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  if (!session?.access_token) {
+  const headers = await buildAuthenticatedEdgeHeaders()
+  if (!headers.Authorization?.startsWith('Bearer ')) {
     throw new Error('Sign in required')
   }
   const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/admin-api`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: anon,
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify(body),
   })
   const json = (await res.json()) as Record<string, unknown>
@@ -556,19 +482,13 @@ export async function invokePulseDataIo<T = unknown>(body: PulseDataIoBody): Pro
   if (!url || !anon) {
     throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
   }
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  if (!session?.access_token) {
+  const headers = await buildAuthenticatedEdgeHeaders()
+  if (!headers.Authorization?.startsWith('Bearer ')) {
     throw new Error('Sign in required')
   }
   const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/pulse-data-io`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: anon,
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify(body),
   })
   const json = (await res.json()) as T & { error?: unknown }
@@ -683,4 +603,39 @@ export async function invokeClientErrorReport(body: ClientErrorReportBody): Prom
   } catch {
     /* non-blocking */
   }
+}
+
+export type PulseActiveCompanyBody =
+  | { action: 'resolve' }
+  | { action: 'sync_context'; companyId: string }
+
+/** Resolve or sync active company context (`pulse-active-company` Edge Function). */
+export async function invokePulseActiveCompany(body: PulseActiveCompanyBody): Promise<Record<string, unknown>> {
+  if (!supabase) {
+    throw new Error('Supabase is not configured')
+  }
+  const url = import.meta.env.VITE_SUPABASE_URL
+  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
+  if (!url || !anon) {
+    throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
+  }
+
+  const headers = await buildAuthenticatedEdgeHeaders()
+  if (!headers.Authorization?.startsWith('Bearer ')) {
+    throw new Error('Sign in required')
+  }
+
+  const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/pulse-active-company`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  })
+
+  const json = (await res.json()) as Record<string, unknown>
+  if (!res.ok) {
+    const err = json.error
+    const errMsg = typeof err === 'string' ? err : JSON.stringify(err ?? res.status)
+    throw new Error(errMsg)
+  }
+  return json
 }
