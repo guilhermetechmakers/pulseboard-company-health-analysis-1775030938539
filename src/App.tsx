@@ -14,6 +14,7 @@ import {
   LoginPage,
   DashboardPage,
   CreateCompanyPage,
+  CompanyWizardEditPage,
   CompanyDetailPage,
   FinancialsPage,
   MarketDataPage,
@@ -92,6 +93,7 @@ export default function App() {
                   <Route path="/company/scope-notice" element={<Guard><SingleCompanyBlockedPage /></Guard>} />
                   <Route path="/workspace/blocked" element={<Guard><SingleCompanyBlockedPage /></Guard>} />
                   <Route path="/company" element={<Workspace><CompanyDetailPage /></Workspace>} />
+                  <Route path="/company/wizard/edit" element={<Workspace><CompanyWizardEditPage /></Workspace>} />
                   <Route path="/financials" element={<Workspace><FinancialsPage /></Workspace>} />
                   <Route path="/market" element={<Workspace><MarketDataPage /></Workspace>} />
                   <Route path="/social-brand" element={<Workspace><SocialBrandPage /></Workspace>} />

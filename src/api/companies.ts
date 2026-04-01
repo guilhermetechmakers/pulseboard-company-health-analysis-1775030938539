@@ -235,6 +235,110 @@ export async function completeWizardAndCreateCompany(wizard: OnboardingWizardDat
   return companyId
 }
 
+/** Update existing single-company workspace from wizard data (guided edit). */
+export async function completeWizardAndUpdateCompany(companyId: string, wizard: OnboardingWizardData): Promise<string> {
+  if (!supabase) throw new Error('Supabase is not configured')
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error('Sign in required')
+
+  const { data: owned, error: ownErr } = await supabase
+    .from('companies')
+    .select('id')
+    .eq('id', companyId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+  if (ownErr) throw new Error(ownErr.message)
+  if (!owned || typeof (owned as { id?: string }).id !== 'string') {
+    throw new Error('Company not found or access denied')
+  }
+
+  const productsServices = (wizard.step2.products_services ?? []).map((s) => s.trim()).filter(Boolean)
+  const productsJoined = productsServices.length > 0 ? productsServices.join(', ') : null
+
+  const { error: cErr } = await supabase
+    .from('companies')
+    .update({
+      name: wizard.step1.name.trim(),
+      website: wizard.step1.website.trim() || null,
+      industry: wizard.step2.industry.trim() || null,
+      business_model: wizard.step2.business_model.trim() || null,
+      target_customer: wizard.step2.target_customers.trim() || null,
+      target_customers: wizard.step2.target_customers.trim() || null,
+      products: productsJoined,
+      products_services: productsServices,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', companyId)
+    .eq('user_id', user.id)
+
+  if (cErr) throw new Error(cErr.message)
+
+  const revenue = parseOptNum(wizard.step3.revenue)
+  const expenses = parseOptNum(wizard.step3.expenses)
+  const profit = parseOptNum(wizard.step3.profit_margin_pct)
+  const cash = parseOptNum(wizard.step3.cash)
+  const debt = parseOptNum(wizard.step3.debt)
+
+  const { error: fErr } = await supabase.from('company_financials').upsert({
+    company_id: companyId,
+    revenue,
+    expenses,
+    profit,
+    cash,
+    debt,
+    updated_at: new Date().toISOString(),
+  })
+  if (fErr) throw new Error(fErr.message)
+
+  const competitors = (wizard.step4.competitors ?? []).map((c) => ({ name: c.name }))
+  const trends = (wizard.step4.trends ?? []).map((t) => t)
+
+  const { error: mErr } = await supabase.from('company_market_data').upsert({
+    company_id: companyId,
+    competitors,
+    pricing_matrix: wizard.step4.pricing_note.trim() ? [{ note: wizard.step4.pricing_note.trim() }] : [],
+    trends,
+    opportunities: wizard.step4.market_segments.trim()
+      ? [{ label: wizard.step4.market_segments.trim(), priority: 'medium' }]
+      : [],
+    threats: [],
+    updated_at: new Date().toISOString(),
+  })
+  if (mErr) throw new Error(mErr.message)
+
+  const ch0 = wizard.step5.channels?.[0]
+  const followers = parseOptNum(ch0?.followers)
+  const engagement = parseOptNum(ch0?.engagement)
+  const websiteTraffic = parseOptNum(wizard.step5.website_traffic)
+
+  const { error: sErr } = await supabase.from('company_social').upsert({
+    company_id: companyId,
+    followers,
+    engagement_rate: engagement,
+    posts_count: parseOptNum(wizard.step5.posting_frequency),
+    website_traffic: websiteTraffic,
+    post_metrics: (wizard.step5.channels ?? []).map((c) => ({
+      platform: c.platform,
+      followers: parseOptNum(c.followers),
+      engagement: parseOptNum(c.engagement),
+    })),
+    updated_at: new Date().toISOString(),
+  })
+  if (sErr) throw new Error(sErr.message)
+
+  await logCompanyTelemetryEvent('company_updated_via_wizard', { companyId })
+
+  await supabase.from('analysis_history').insert({
+    company_id: companyId,
+    summary: 'Company data updated via guided wizard.',
+    details: { kind: 'wizard_edit' },
+  })
+
+  return companyId
+}
+
 export async function deleteMyCompany(): Promise<void> {
   if (!supabase) throw new Error('Supabase is not configured')
   const {

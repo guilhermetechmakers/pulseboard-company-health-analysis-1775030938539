@@ -9,6 +9,7 @@ import { SettingsPage } from '@/pages/settings-page'
 
 export { DashboardPage, CompanyDetailPage, SettingsPage }
 export { CreateCompanyPage } from '@/pages/create-company-page'
+export { CompanyWizardEditPage } from '@/pages/company-wizard-edit-page'
 export { GenerateAnalysisPage } from '@/pages/generate-analysis-page'
 export { ReportViewerPage } from '@/pages/report-viewer-page'
 export { ExportSettingsPage } from '@/pages/export-settings-page'
@@ -55,15 +56,7 @@ export function LandingPage() {
   )
 }
 
-export const FinancialsPage = () => (
-  <PageTemplate title="Financials form" description="Revenue, expenses, margin, cash, debt, CAC/LTV, concentration, and uploads." />
-)
-export const MarketDataPage = () => (
-  <PageTemplate title="Market data form" description="Competitor matrix, trends, opportunities, and threats with priorities." />
-)
-export const SocialBrandPage = () => (
-  <PageTemplate title="Social & brand form" description="Channel metrics, engagement cadence, website traffic, and ratings." />
-)
+export { FinancialsPage, MarketDataPage, SocialBrandPage } from '@/pages/workspace-data-form-pages'
 
 export { AdminDashboardPage } from '@/pages/admin-dashboard-page'
 export { AdminUsersPage } from '@/pages/admin-users-page'

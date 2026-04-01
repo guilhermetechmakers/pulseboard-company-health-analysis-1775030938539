@@ -36,6 +36,7 @@ export default {
           DEFAULT: 'rgb(var(--danger))',
           foreground: '255 255 255',
         },
+        warning: 'rgb(var(--warning))',
       },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],

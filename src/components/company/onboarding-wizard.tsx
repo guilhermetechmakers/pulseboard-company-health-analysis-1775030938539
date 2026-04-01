@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -12,6 +12,7 @@ import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
 import {
   completeWizardAndCreateCompany,
+  completeWizardAndUpdateCompany,
   getOnboardingDraft,
   upsertOnboardingDraft,
   logCompanyTelemetryEvent,
@@ -20,7 +21,10 @@ import {
 import { EMPTY_WIZARD_DATA, type OnboardingWizardData } from '@/types/company-wizard'
 import { wizardCompletenessPercent, wizardMeetsMinimumThreshold } from '@/lib/wizard-completeness'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
+import { useMyCompany } from '@/hooks/use-my-company'
+import { useCompanyAggregates } from '@/hooks/use-company-aggregates'
 import { invokeComputeHealthScore } from '@/lib/supabase-functions'
+import { buildWizardDataFromCompany } from '@/lib/company-to-wizard'
 
 const STEP_LABELS = ['Basics', 'Profile', 'Financials', 'Market', 'Social & brand']
 
@@ -28,28 +32,59 @@ function clampStep(n: number): number {
   return Math.min(5, Math.max(1, Math.floor(n)))
 }
 
-export function OnboardingWizard() {
+export interface OnboardingWizardProps {
+  mode?: 'create' | 'edit'
+}
+
+/** Blueprint alias — same component as onboarding wizard. */
+export function CreateCompanyWizard(props: OnboardingWizardProps) {
+  return <OnboardingWizard {...props} />
+}
+
+export function OnboardingWizard({ mode = 'create' }: OnboardingWizardProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [step, setStep] = useState(1)
   const [data, setData] = useState<OnboardingWizardData>({ ...EMPTY_WIZARD_DATA })
+  const editInitForCompany = useRef<string | null>(null)
+
+  const { data: editCompany } = useMyCompany()
+  const editCompanyId = mode === 'edit' ? editCompany?.id : undefined
+  const { data: editAgg, isLoading: editAggLoading } = useCompanyAggregates(editCompanyId)
 
   const draftQuery = useQuery({
     queryKey: ['onboarding-draft'],
     queryFn: () => getOnboardingDraft(),
+    enabled: mode === 'create',
   })
 
   useEffect(() => {
+    if (mode !== 'create') return
     const d = draftQuery.data
     if (!d) return
     setStep(clampStep(d.step))
     setData(d.data)
-  }, [draftQuery.data])
+  }, [draftQuery.data, mode])
+
+  useEffect(() => {
+    if (mode !== 'edit' || !editCompany?.id || !editAgg) return
+    if (editInitForCompany.current === editCompany.id) return
+    editInitForCompany.current = editCompany.id
+    setData(
+      buildWizardDataFromCompany(
+        editCompany,
+        editAgg.financials ?? null,
+        editAgg.market ?? null,
+        editAgg.social ?? null,
+      ),
+    )
+  }, [mode, editCompany, editAgg])
 
   const debounced = useDebouncedValue(data, 500)
   const debouncedStep = useDebouncedValue(step, 500)
 
   useEffect(() => {
+    if (mode !== 'create') return
     if (!draftQuery.isFetched || draftQuery.isFetching) return
     const trivial =
       debouncedStep === 1 &&
@@ -64,7 +99,7 @@ export function OnboardingWizard() {
         toast.error(msg)
       }
     })()
-  }, [debounced, debouncedStep, draftQuery.isFetched, draftQuery.isFetching, draftQuery.data])
+  }, [debounced, debouncedStep, draftQuery.isFetched, draftQuery.isFetching, draftQuery.data, mode])
 
   const pct = useMemo(() => wizardCompletenessPercent(data), [data])
   const canFinish = wizardMeetsMinimumThreshold(data)
@@ -83,12 +118,18 @@ export function OnboardingWizard() {
       if (!wizardMeetsMinimumThreshold(data)) {
         throw new Error('Complete the minimum fields before finishing.')
       }
+      if (mode === 'edit') {
+        if (!editCompany?.id) throw new Error('No company loaded')
+        return completeWizardAndUpdateCompany(editCompany.id, data)
+      }
       return completeWizardAndCreateCompany(data)
     },
     onSuccess: async (companyId) => {
-      toast.success('Company workspace ready')
+      toast.success(mode === 'edit' ? 'Company updated' : 'Company workspace ready')
       await queryClient.invalidateQueries({ queryKey: ['company', 'mine'] })
       await queryClient.invalidateQueries({ queryKey: ['onboarding-draft'] })
+      await queryClient.invalidateQueries({ queryKey: ['company-aggregates', companyId] })
+      await queryClient.invalidateQueries({ queryKey: ['company-activity-feed'] })
       try {
         await invokeComputeHealthScore({ companyId })
       } catch {
@@ -99,10 +140,11 @@ export function OnboardingWizard() {
     onError: (e: unknown) => {
       if (e instanceof CompanyConflictError) {
         toast.error(e.message, { description: e.remediation })
-        void navigate('/company', { replace: true })
+        if (mode === 'create') void navigate('/company', { replace: true })
         return
       }
-      const msg = e instanceof Error ? e.message : 'Could not create company'
+      const msg =
+        e instanceof Error ? e.message : mode === 'edit' ? 'Could not update company' : 'Could not create company'
       toast.error(msg)
     },
   })
@@ -146,17 +188,32 @@ export function OnboardingWizard() {
     }))
   }
 
+  const editBlocking =
+    mode === 'edit' && (editAggLoading || !editCompany?.id || editInitForCompany.current !== editCompany.id)
+
+  if (editBlocking) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-4 animate-fade-in motion-reduce:animate-none" aria-busy="true">
+        <div className="h-8 w-48 animate-pulse rounded-lg bg-muted motion-reduce:animate-none" />
+        <div className="h-64 w-full animate-pulse rounded-xl bg-muted motion-reduce:animate-none" />
+      </div>
+    )
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-8 animate-fade-in motion-reduce:animate-none">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">Create your company</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+          {mode === 'edit' ? 'Edit your company' : 'Create your company'}
+        </h1>
         <p className="mt-2 text-sm text-muted-foreground md:text-base">
-          Guided onboarding — drafts autosave. You need one company per account; finish when completeness meets the
-          minimum bar.
+          {mode === 'edit'
+            ? 'Update profile, financials, market, and social inputs — single-company mode stays enforced.'
+            : 'Guided onboarding — drafts autosave. You need one company per account; finish when completeness meets the minimum bar.'}
         </p>
       </div>
 
-      {draftQuery.data?.lastSavedAt ? (
+      {mode === 'create' && draftQuery.data?.lastSavedAt ? (
         <p className="text-xs text-muted-foreground" role="status">
           Resumed saved draft · last saved{' '}
           {new Date(draftQuery.data.lastSavedAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
@@ -508,7 +565,13 @@ export function OnboardingWizard() {
               disabled={!canFinish || finishMutation.isPending}
               onClick={() => finishMutation.mutate()}
             >
-              {finishMutation.isPending ? 'Creating…' : 'Finish & open workspace'}
+              {finishMutation.isPending
+                ? mode === 'edit'
+                  ? 'Saving…'
+                  : 'Creating…'
+                : mode === 'edit'
+                  ? 'Save changes'
+                  : 'Finish & open workspace'}
             </Button>
           )}
         </div>

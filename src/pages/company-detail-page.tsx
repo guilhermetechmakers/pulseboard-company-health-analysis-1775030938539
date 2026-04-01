@@ -1,20 +1,26 @@
-import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useMemo, useState, useEffect } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Sparkles, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
-import { SyncHistoryPanel } from '@/components/integrations/sync-history-panel'
-import { ProfileSummaryCard } from '@/components/company/profile-summary-card'
-import { HealthScoreCard } from '@/components/company/health-score-card'
-import { AnalysisHistoryPanel } from '@/components/analysis/analysis-history-panel'
+import { CompanyDetailShell } from '@/components/company/detail/company-detail-shell'
+import { CompanyHeader } from '@/components/company/detail/company-header'
+import { HealthScorePanel } from '@/components/company/detail/health-score-panel'
+import { DataCompletenessBadge } from '@/components/company/detail/data-completeness-badge'
+import { AIAnalysisPanel } from '@/components/company/detail/ai-analysis-panel'
+import { ReportsPanel } from '@/components/company/detail/reports-panel'
+import { ActivityLogPanel } from '@/components/company/detail/activity-log-panel'
 import { CacheStatusBadge } from '@/components/cache/cache-status-badge'
-import { AnalysisHistoryTimeline } from '@/components/company/analysis-history-timeline'
 import { SaveInputSnapshotPanel } from '@/components/company/save-input-snapshot-panel'
 import { CompanyWorkspaceForms } from '@/components/company/company-workspace-forms'
+import { FinancialsForm } from '@/components/company/forms/financials-form'
+import { MarketDataForm } from '@/components/company/forms/market-data-form'
+import { SocialBrandForm } from '@/components/company/forms/social-brand-form'
 import { DataIoActivityPanel } from '@/components/data-io/data-io-activity-panel'
+import { AnalysisHistoryTimeline } from '@/components/company/analysis-history-timeline'
+import { OnboardingWizard } from '@/components/company/onboarding-wizard'
 import { useMyCompany } from '@/hooks/use-my-company'
 import { useCompanyReports } from '@/hooks/use-analysis'
 import { useIntegrations } from '@/hooks/use-integrations'
@@ -26,9 +32,18 @@ import {
   hasSocialSignals,
 } from '@/hooks/use-company-aggregates'
 import { useCompanyHealthScores, useComputeHealthScore } from '@/hooks/use-health-scores'
-import { buildCompletenessSlices, completenessPercent, healthSubscores } from '@/lib/dashboard-utils'
+import { useCompanyActivityFeed } from '@/hooks/use-company-activity-feed'
+import { useAuth } from '@/contexts/auth-context'
+import {
+  buildCompletenessSlices,
+  completenessPercent,
+  healthSubscores,
+  type CompanyDetailTab,
+} from '@/lib/dashboard-utils'
 import { pickNumber, asRecord } from '@/lib/safe-data'
 import type { CompanyHealthScoreRow } from '@/types/health-score'
+
+const TAB_VALUES: CompanyDetailTab[] = ['overview', 'data', 'financials', 'market', 'social', 'reports', 'activity']
 
 function subScoreMap(scores: unknown): Record<string, number> {
   const entries = healthSubscores(scores)
@@ -39,7 +54,27 @@ function subScoreMap(scores: unknown): Record<string, number> {
   return m
 }
 
+function normalizeTab(raw: string | null): CompanyDetailTab {
+  if (raw && TAB_VALUES.includes(raw as CompanyDetailTab)) return raw as CompanyDetailTab
+  return 'overview'
+}
+
 export function CompanyDetailPage() {
+  const { user } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tab = normalizeTab(searchParams.get('tab'))
+
+  const setTab = (next: string) => {
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev)
+        p.set('tab', next)
+        return p
+      },
+      { replace: true },
+    )
+  }
+
   const { data: company, isLoading } = useMyCompany()
   const companyId = company?.id
   const { data: integrations = [] } = useIntegrations(companyId)
@@ -65,6 +100,11 @@ export function CompanyDetailPage() {
   } = useCompanyHealthScores(companyId ?? null, 48)
   const computeHealth = useComputeHealthScore()
   const [selectedHealthId, setSelectedHealthId] = useState<string | null>(null)
+
+  const { data: activityFeed = [], isLoading: activityFeedLoading } = useCompanyActivityFeed(
+    companyId,
+    user?.id,
+  )
 
   const safeHistory = useMemo(
     () => (Array.isArray(healthHistory) ? healthHistory : []) as CompanyHealthScoreRow[],
@@ -100,6 +140,33 @@ export function CompanyDetailPage() {
       ? Number(latestRow.overall)
       : overallStored ?? subMap['Overall'] ?? null
 
+  const fin = agg?.financials as Record<string, unknown> | null | undefined
+  const monthlyRevenue = fin?.revenue != null ? Number(fin.revenue) : null
+  const profitRaw = fin?.profit != null ? Number(fin.profit) : null
+  const profitMarginPct =
+    monthlyRevenue != null &&
+    profitRaw != null &&
+    Number.isFinite(monthlyRevenue) &&
+    Number.isFinite(profitRaw) &&
+    monthlyRevenue !== 0
+      ? (profitRaw / monthlyRevenue) * 100
+      : null
+  const cashBalance = fin?.cash != null ? Number(fin.cash) : null
+
+  const tabParam = searchParams.get('tab')
+  useEffect(() => {
+    if (tabParam && !TAB_VALUES.includes(tabParam as CompanyDetailTab)) {
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev)
+          p.set('tab', 'overview')
+          return p
+        },
+        { replace: true },
+      )
+    }
+  }, [tabParam, setSearchParams])
+
   if (isLoading) {
     return (
       <section className="space-y-6 animate-fade-in motion-reduce:animate-none">
@@ -113,23 +180,21 @@ export function CompanyDetailPage() {
     return (
       <section className="space-y-6">
         <h1 className="text-3xl font-semibold tracking-tight">Company workspace</h1>
-        <Card className="p-8 text-center shadow-card">
-          <p className="text-muted-foreground">No company on file yet.</p>
-          <Button asChild className="mt-4 min-h-[44px] transition-transform duration-200 hover:scale-[1.02]">
-            <Link to="/company/create">Create company</Link>
-          </Button>
-        </Card>
+        <p className="text-muted-foreground">
+          PulseBoard enforces one company per account. Complete the guided wizard to create your workspace.
+        </p>
+        <OnboardingWizard mode="create" />
       </section>
     )
   }
 
   return (
-    <section className="space-y-8 animate-fade-in-up motion-reduce:animate-none">
+    <CompanyDetailShell>
       <div className="flex flex-col gap-4 border-b border-border pb-6 md:flex-row md:items-start md:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Company workspace</h1>
           <p className="mt-1 text-muted-foreground">
-            Primary PulseBoard workspace — edit structured inputs, refresh rule-based scores, and launch AI analysis.
+            Primary PulseBoard workspace — structured inputs, health scoring, AI analysis, and exports.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -155,14 +220,20 @@ export function CompanyDetailPage() {
         </div>
       </div>
 
-      <ProfileSummaryCard company={company} />
+      <CompanyHeader
+        company={company}
+        monthlyRevenue={monthlyRevenue}
+        profitMarginPct={profitMarginPct}
+        cashBalance={cashBalance}
+        overallHealth={overallVal}
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
         {healthLoading ? (
           <Skeleton className="h-80 w-full lg:col-span-2" />
         ) : (
           <div className="lg:col-span-2">
-            <HealthScoreCard
+            <HealthScorePanel
               className="lg:col-span-2"
               pulseCache={healthPulse}
               isFetching={healthFetching}
@@ -175,18 +246,18 @@ export function CompanyDetailPage() {
             />
           </div>
         )}
-        <Card className="border-border/80 p-6 shadow-card">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <h2 className="text-lg font-semibold tracking-tight">Data completeness</h2>
-            <CacheStatusBadge meta={agg?.pulseCache} isFetching={aggFetching} isStale={aggStale} />
-          </div>
-          <Progress value={pct} className="mt-4" />
-          <p className="mt-2 text-sm text-muted-foreground">{pct}% complete</p>
-          <p className="mt-4 text-xs text-muted-foreground">
-            Guided slices include profile, financials, market, social, and at least one connector.
-          </p>
-        </Card>
+        <div className="space-y-4">
+          <DataCompletenessBadge percent={pct} slices={slices} />
+          <Card className="border-border/80 p-4 shadow-card">
+            <p className="text-xs font-medium text-muted-foreground">Aggregate cache</p>
+            <div className="mt-2">
+              <CacheStatusBadge meta={agg?.pulseCache} isFetching={aggFetching} isStale={aggStale} />
+            </div>
+          </Card>
+        </div>
       </div>
+
+      <AIAnalysisPanel report={agg?.latestReport ?? null} companyId={companyId} />
 
       <SaveInputSnapshotPanel
         companyId={companyId}
@@ -204,8 +275,8 @@ export function CompanyDetailPage() {
         onSelect={(e) => setSelectedHealthId((prev) => (prev === e.id ? null : e.id))}
       />
 
-      <Tabs defaultValue="overview">
-        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
+      <Tabs defaultValue="overview" value={tab} onValueChange={setTab}>
+        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1" aria-label="Company workspace sections">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="data">Edit data</TabsTrigger>
           <TabsTrigger value="financials">Financials</TabsTrigger>
@@ -214,7 +285,7 @@ export function CompanyDetailPage() {
           <TabsTrigger value="reports">Reports</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
-        <TabsContent value="overview">
+        <TabsContent value="overview" className="mt-6">
           <div className="grid gap-6 md:grid-cols-2">
             <Card className="border-border/80 p-6 shadow-card transition-shadow duration-200 hover:shadow-md">
               <h3 className="font-semibold">Connector status</h3>
@@ -249,7 +320,7 @@ export function CompanyDetailPage() {
             </Card>
           </div>
         </TabsContent>
-        <TabsContent value="data">
+        <TabsContent value="data" className="mt-6">
           <CompanyWorkspaceForms
             companyId={companyId}
             company={company}
@@ -258,61 +329,51 @@ export function CompanyDetailPage() {
             social={agg?.social ?? null}
           />
         </TabsContent>
-        <TabsContent value="financials">
+        <TabsContent value="financials" className="mt-6 space-y-4">
+          <FinancialsForm companyId={companyId} financials={agg?.financials ?? null} />
           <Card className="border-border/80 p-6 shadow-card">
-            <p className="text-sm text-muted-foreground">
-              Full-page editor with uploads and calculators lives on the dedicated financials route.
-            </p>
-            <Button asChild className="mt-4 min-h-[44px]">
-              <Link to="/financials">Open financials form</Link>
+            <p className="text-sm text-muted-foreground">Advanced calculators, uploads, and CAC/LTV live on the dedicated route.</p>
+            <Button asChild className="mt-4 min-h-[44px]" variant="secondary">
+              <Link to="/financials">Open full financials page</Link>
             </Button>
           </Card>
         </TabsContent>
-        <TabsContent value="market">
+        <TabsContent value="market" className="mt-6 space-y-4">
+          <MarketDataForm companyId={companyId} market={agg?.market ?? null} />
           <Card className="border-border/80 p-6 shadow-card">
-            <p className="text-sm text-muted-foreground">Structured competitor matrix and threat/opportunity tags.</p>
-            <Button asChild className="mt-4 min-h-[44px]">
-              <Link to="/market">Open market data form</Link>
+            <p className="text-sm text-muted-foreground">Pricing matrix and threat/opportunity priorities on the dedicated market page.</p>
+            <Button asChild className="mt-4 min-h-[44px]" variant="secondary">
+              <Link to="/market">Open full market form</Link>
             </Button>
           </Card>
         </TabsContent>
-        <TabsContent value="social">
+        <TabsContent value="social" className="mt-6 space-y-4">
+          <SocialBrandForm companyId={companyId} social={agg?.social ?? null} />
           <Card className="border-border/80 p-6 shadow-card">
-            <p className="text-sm text-muted-foreground">Channel metrics, cadence, and traffic inputs.</p>
-            <Button asChild className="mt-4 min-h-[44px]">
-              <Link to="/social-brand">Open social & brand form</Link>
+            <p className="text-sm text-muted-foreground">CSV import and extended channel rows on the dedicated social & brand page.</p>
+            <Button asChild className="mt-4 min-h-[44px]" variant="secondary">
+              <Link to="/social-brand">Open full social form</Link>
             </Button>
           </Card>
         </TabsContent>
-        <TabsContent value="reports">
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-lg font-semibold tracking-tight">Analysis runs</h3>
-              <Button asChild variant="primary" className="min-h-[44px]">
-                <Link to="/generate">New analysis</Link>
-              </Button>
-            </div>
-            {agg?.latestReport ? (
-              <Card className="border-border/80 p-4 shadow-card">
-                <p className="text-sm text-muted-foreground">Latest aggregate: {agg.latestReport.status}</p>
-                <Button asChild className="mt-2 min-h-[44px]">
-                  <Link to={`/report/${agg.latestReport.id}`}>Open latest</Link>
-                </Button>
-              </Card>
-            ) : null}
-            <AnalysisHistoryPanel
-              companyId={companyId}
-              reports={Array.isArray(companyReports) ? companyReports : []}
-              pulseCache={reportsPulse}
-              isFetching={reportsFetching}
-              isStale={reportsStale}
-            />
-          </div>
+        <TabsContent value="reports" className="mt-6">
+          <ReportsPanel
+            companyId={companyId}
+            reports={Array.isArray(companyReports) ? companyReports : []}
+            pulseCache={reportsPulse}
+            isFetching={reportsFetching}
+            isStale={reportsStale}
+          />
         </TabsContent>
-        <TabsContent value="activity">
-          <SyncHistoryPanel jobs={jobs ?? []} isLoading={jobsLoading} />
+        <TabsContent value="activity" className="mt-6">
+          <ActivityLogPanel
+            jobs={jobs ?? []}
+            jobsLoading={jobsLoading}
+            feed={Array.isArray(activityFeed) ? activityFeed : []}
+            feedLoading={activityFeedLoading}
+          />
         </TabsContent>
       </Tabs>
-    </section>
+    </CompanyDetailShell>
   )
 }

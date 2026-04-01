@@ -1,11 +1,30 @@
 import type { CompanyRow } from '@/types/integrations'
 import { asRecord, pickString } from '@/lib/safe-data'
 
+/** In-page tab keys for `/company?tab=` deep links. */
+export type CompanyDetailTab = 'overview' | 'data' | 'financials' | 'market' | 'social' | 'reports' | 'activity'
+
+const COMPANY_DETAIL_TAB_SET = new Set<string>([
+  'overview',
+  'data',
+  'financials',
+  'market',
+  'social',
+  'reports',
+  'activity',
+])
+
+export function parseCompanyDetailTab(raw: string | null | undefined): CompanyDetailTab {
+  if (raw && COMPANY_DETAIL_TAB_SET.has(raw)) return raw as CompanyDetailTab
+  return 'overview'
+}
+
 export interface CompletenessSlice {
   key: string
   label: string
   done: boolean
   href: string
+  tab: CompanyDetailTab
 }
 
 export function buildCompletenessSlices(
@@ -16,36 +35,42 @@ export function buildCompletenessSlices(
   integrationCount: number,
 ): CompletenessSlice[] {
   const c = company
+  const hasCompany = Boolean(c)
   return [
     {
       key: 'profile',
       label: 'Company profile',
       done: Boolean(pickString(c?.name) && pickString(c?.industry)),
-      href: '/company/create',
+      href: hasCompany ? '/company?tab=data' : '/company/create',
+      tab: 'data',
     },
     {
       key: 'financials',
       label: 'Financials',
       done: hasFinancials,
-      href: '/financials',
+      href: hasCompany ? '/company?tab=financials' : '/financials',
+      tab: 'financials',
     },
     {
       key: 'market',
       label: 'Market data',
       done: hasMarket,
-      href: '/market',
+      href: hasCompany ? '/company?tab=market' : '/market',
+      tab: 'market',
     },
     {
       key: 'social',
       label: 'Social & brand',
       done: hasSocial,
-      href: '/social-brand',
+      href: hasCompany ? '/company?tab=social' : '/social-brand',
+      tab: 'social',
     },
     {
       key: 'integrations',
       label: 'At least one connector',
       done: integrationCount > 0,
       href: '/settings',
+      tab: 'overview',
     },
   ]
 }

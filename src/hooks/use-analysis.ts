@@ -190,6 +190,7 @@ export function useRunAnalysis() {
       await queryClient.invalidateQueries({ queryKey: ['company-aggregates', vars.companyId] })
       await queryClient.invalidateQueries({ queryKey: ['company', 'mine'] })
       await queryClient.invalidateQueries({ queryKey: ['company-health-scores', vars.companyId] })
+      await queryClient.invalidateQueries({ queryKey: ['company-activity-feed'] })
     },
     onError: (e: Error) => {
       toast.error(e.message ?? 'Analysis failed')
