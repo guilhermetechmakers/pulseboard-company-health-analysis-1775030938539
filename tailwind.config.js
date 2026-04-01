@@ -28,6 +28,14 @@ export default {
         border: 'rgb(var(--border))',
         input: 'rgb(var(--input))',
         ring: 'rgb(var(--ring))',
+        muted: {
+          DEFAULT: 'rgb(var(--muted))',
+          foreground: 'rgb(var(--muted-foreground))',
+        },
+        destructive: {
+          DEFAULT: 'rgb(var(--danger))',
+          foreground: '255 255 255',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],

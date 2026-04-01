@@ -43,3 +43,6 @@ export const api = {
     apiRequest<T>(endpoint, { method: 'PATCH', body: JSON.stringify(payload) }),
   delete: <T>(endpoint: string) => apiRequest<T>(endpoint, { method: 'DELETE' }),
 }
+
+/** Prefer `@/lib/supabase-functions` for authenticated Edge Function calls (native fetch + session). */
+export { invokeAnalyzeCompanyHealth } from '@/lib/supabase-functions'

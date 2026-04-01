@@ -44,3 +44,52 @@ export const INTEGRATION_PROVIDERS: {
     scopes: ['File upload (in-app)'],
   },
 ]
+
+/** Legacy REST-shaped types for `src/api/integrations.ts` (optional backend bridge). */
+export interface IntegrationConnection {
+  id: string
+  provider: IntegrationProvider
+  status: 'disconnected' | 'connected' | 'syncing' | 'error'
+  scopes: string[]
+  cadence: string
+  lastSyncedAt: string | null
+  nextSyncAt: string | null
+  updatedAt: string
+}
+
+export interface SyncHistoryItem {
+  id: string
+  provider: string
+  status: string
+  recordsSynced?: number
+  errorMessage?: string | null
+}
+
+export interface DashboardPayload {
+  hasCompany: boolean
+  companyName: string | null
+  healthScore: number
+  completeness: number
+  staleSignals: string[]
+  latestAnalyses: { id: string; title: string; createdAt: string; score: number }[]
+  integrations: IntegrationConnection[]
+  syncHistory: SyncHistoryItem[]
+}
+
+export interface CompanyDetailPayload {
+  id: string
+  name: string
+  industry: string | null
+  website: string | null
+  goals: string | null
+  healthBreakdown: { financial: number; market: number; social: number }
+  lastUpdatedAt: string | null
+  financials: { label: string; value: number | null }[]
+  market: { competitor: string; threatLevel: string; opportunity: string }[]
+  social: { channel: string; followers: number | null; engagementRate: number | null }[]
+}
+
+export interface IntegrationActionInput {
+  integrationId: string
+  companyId: string
+}

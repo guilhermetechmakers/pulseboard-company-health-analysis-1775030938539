@@ -58,7 +58,9 @@ export default function App() {
             <Route path="/market" element={<MarketDataPage />} />
             <Route path="/social-brand" element={<SocialBrandPage />} />
             <Route path="/analysis/generate" element={<GenerateAnalysisPage />} />
+            <Route path="/generate" element={<GenerateAnalysisPage />} />
             <Route path="/report/:id" element={<ReportViewerPage />} />
+            <Route path="/reports/:reportId" element={<ReportViewerPage />} />
             <Route path="/export/:id" element={<ExportSettingsPage />} />
             <Route path="/profile" element={<UserProfilePage />} />
             <Route path="/settings" element={<SettingsPage />} />

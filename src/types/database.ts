@@ -8,6 +8,12 @@ export interface Database {
           name: string
           industry: string | null
           stage: string | null
+          website: string | null
+          business_model: string | null
+          target_customer: string | null
+          goals: string | null
+          products: string | null
+          health_scores: Record<string, unknown>
           created_at: string
           updated_at: string
         }
@@ -17,6 +23,12 @@ export interface Database {
           name: string
           industry?: string | null
           stage?: string | null
+          website?: string | null
+          business_model?: string | null
+          target_customer?: string | null
+          goals?: string | null
+          products?: string | null
+          health_scores?: Record<string, unknown>
           created_at?: string
           updated_at?: string
         }
@@ -24,13 +36,25 @@ export interface Database {
           name?: string
           industry?: string | null
           stage?: string | null
+          website?: string | null
+          business_model?: string | null
+          target_customer?: string | null
+          goals?: string | null
+          products?: string | null
+          health_scores?: Record<string, unknown>
           updated_at?: string
         }
+        Relationships: []
       }
       reports: {
         Row: {
           id: string
           company_id: string
+          initiated_by: string | null
+          analysis_depth: string
+          source_model: string | null
+          benchmarking_enabled: boolean
+          consent_recorded_at: string | null
           status: string
           executive_summary: string | null
           swot: Record<string, unknown>
@@ -48,6 +72,11 @@ export interface Database {
         Insert: {
           id?: string
           company_id: string
+          initiated_by?: string | null
+          analysis_depth?: string
+          source_model?: string | null
+          benchmarking_enabled?: boolean
+          consent_recorded_at?: string | null
           status?: string
           executive_summary?: string | null
           swot?: Record<string, unknown>
@@ -63,25 +92,27 @@ export interface Database {
           updated_at?: string
         }
         Update: Partial<Database['public']['Tables']['reports']['Insert']>
+        Relationships: []
       }
-      integration_credentials: {
+      report_snapshots: {
         Row: {
           id: string
-          company_id: string
-          provider: string
-          encrypted_payload: string
+          report_id: string
+          created_by: string | null
+          label: string
+          sections: Record<string, unknown>
           created_at: string
-          updated_at: string
         }
         Insert: {
           id?: string
-          company_id: string
-          provider: string
-          encrypted_payload: string
+          report_id: string
+          created_by?: string | null
+          label?: string
+          sections?: Record<string, unknown>
           created_at?: string
-          updated_at?: string
         }
-        Update: Partial<Database['public']['Tables']['integration_credentials']['Insert']>
+        Update: Partial<Database['public']['Tables']['report_snapshots']['Insert']>
+        Relationships: []
       }
       integrations: {
         Row: {
@@ -93,11 +124,10 @@ export interface Database {
           cadence: string
           last_synced_at: string | null
           next_sync_at: string | null
-          credentials_ref: string | null
           settings: Record<string, unknown>
+          last_error: string | null
           created_at: string
           updated_at: string
-          deleted_at: string | null
         }
         Insert: {
           id?: string
@@ -108,46 +138,35 @@ export interface Database {
           cadence?: string
           last_synced_at?: string | null
           next_sync_at?: string | null
-          credentials_ref?: string | null
           settings?: Record<string, unknown>
+          last_error?: string | null
           created_at?: string
           updated_at?: string
-          deleted_at?: string | null
         }
         Update: Partial<Database['public']['Tables']['integrations']['Insert']>
+        Relationships: []
       }
-      oauth_credentials: {
+      integration_credentials: {
         Row: {
           id: string
-          integration_id: string
+          company_id: string
           provider: string
-          access_token: string
-          refresh_token: string | null
-          expires_at: string | null
-          token_type: string | null
-          scope: string | null
-          account_id: string | null
-          tenant_id: string | null
           encrypted_payload: string
+          integration_id: string | null
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: string
-          integration_id: string
+          company_id: string
           provider: string
-          access_token: string
-          refresh_token?: string | null
-          expires_at?: string | null
-          token_type?: string | null
-          scope?: string | null
-          account_id?: string | null
-          tenant_id?: string | null
-          encrypted_payload?: string
+          encrypted_payload: string
+          integration_id?: string | null
           created_at?: string
           updated_at?: string
         }
-        Update: Partial<Database['public']['Tables']['oauth_credentials']['Insert']>
+        Update: Partial<Database['public']['Tables']['integration_credentials']['Insert']>
+        Relationships: []
       }
       sync_jobs: {
         Row: {
@@ -159,11 +178,9 @@ export interface Database {
           started_at: string | null
           completed_at: string | null
           records_synced: number
-          attempt_count: number
           error_message: string | null
           metadata: Record<string, unknown>
           created_at: string
-          updated_at: string
         }
         Insert: {
           id?: string
@@ -174,13 +191,12 @@ export interface Database {
           started_at?: string | null
           completed_at?: string | null
           records_synced?: number
-          attempt_count?: number
           error_message?: string | null
           metadata?: Record<string, unknown>
           created_at?: string
-          updated_at?: string
         }
         Update: Partial<Database['public']['Tables']['sync_jobs']['Insert']>
+        Relationships: []
       }
       data_snapshots: {
         Row: {
@@ -189,21 +205,21 @@ export interface Database {
           provider: string
           snapshot_type: string
           payload: Record<string, unknown>
-          captured_at: string
+          created_at: string
         }
         Insert: {
           id?: string
           company_id: string
           provider: string
-          snapshot_type: string
+          snapshot_type?: string
           payload?: Record<string, unknown>
-          captured_at?: string
+          created_at?: string
         }
         Update: Partial<Database['public']['Tables']['data_snapshots']['Insert']>
+        Relationships: []
       }
-      financials: {
+      company_financials: {
         Row: {
-          id: string
           company_id: string
           revenue: number | null
           expenses: number | null
@@ -212,13 +228,12 @@ export interface Database {
           liabilities: number | null
           cash: number | null
           debt: number | null
-          metrics: Record<string, unknown>
-          as_of_date: string | null
-          created_at: string
+          per_month_metrics: unknown[]
+          reconciliation_status: string | null
+          source_provider: string | null
           updated_at: string
         }
         Insert: {
-          id?: string
           company_id: string
           revenue?: number | null
           expenses?: number | null
@@ -227,103 +242,119 @@ export interface Database {
           liabilities?: number | null
           cash?: number | null
           debt?: number | null
-          metrics?: Record<string, unknown>
-          as_of_date?: string | null
-          created_at?: string
+          per_month_metrics?: unknown[]
+          reconciliation_status?: string | null
+          source_provider?: string | null
           updated_at?: string
         }
-        Update: Partial<Database['public']['Tables']['financials']['Insert']>
+        Update: Partial<Database['public']['Tables']['company_financials']['Insert']>
+        Relationships: []
       }
-      analytics: {
+      company_analytics: {
         Row: {
-          id: string
           company_id: string
           sessions: number | null
           users: number | null
           pageviews: number | null
           bounce_rate: number | null
-          engagement_rate: number | null
-          traffic_sources: Record<string, unknown>
-          device_breakdown: Record<string, unknown>
-          geo_breakdown: Record<string, unknown>
-          captured_at: string
-          created_at: string
+          engagement_metrics: Record<string, unknown>
+          traffic_sources: unknown[]
+          device_breakdown: unknown[]
+          geo_breakdown: unknown[]
+          source_provider: string | null
+          updated_at: string
         }
         Insert: {
-          id?: string
           company_id: string
           sessions?: number | null
           users?: number | null
           pageviews?: number | null
           bounce_rate?: number | null
-          engagement_rate?: number | null
-          traffic_sources?: Record<string, unknown>
-          device_breakdown?: Record<string, unknown>
-          geo_breakdown?: Record<string, unknown>
-          captured_at?: string
-          created_at?: string
+          engagement_metrics?: Record<string, unknown>
+          traffic_sources?: unknown[]
+          device_breakdown?: unknown[]
+          geo_breakdown?: unknown[]
+          source_provider?: string | null
+          updated_at?: string
         }
-        Update: Partial<Database['public']['Tables']['analytics']['Insert']>
+        Update: Partial<Database['public']['Tables']['company_analytics']['Insert']>
+        Relationships: []
       }
-      social_data: {
+      company_social: {
         Row: {
-          id: string
           company_id: string
-          channel: string
           followers: number | null
           engagement_rate: number | null
           posts_count: number | null
           impressions: number | null
           clicks: number | null
           website_traffic: number | null
-          brand_mentions: number | null
-          captured_at: string
-          created_at: string
+          brand_mentions: unknown[]
+          post_metrics: unknown[]
+          source_provider: string | null
           updated_at: string
         }
         Insert: {
-          id?: string
           company_id: string
-          channel: string
           followers?: number | null
           engagement_rate?: number | null
           posts_count?: number | null
           impressions?: number | null
           clicks?: number | null
           website_traffic?: number | null
-          brand_mentions?: number | null
-          captured_at?: string
-          created_at?: string
+          brand_mentions?: unknown[]
+          post_metrics?: unknown[]
+          source_provider?: string | null
           updated_at?: string
         }
-        Update: Partial<Database['public']['Tables']['social_data']['Insert']>
+        Update: Partial<Database['public']['Tables']['company_social']['Insert']>
+        Relationships: []
       }
-      billing: {
+      company_billing: {
         Row: {
-          id: string
           company_id: string
-          stripe_customer_id: string | null
-          plan_name: string | null
-          status: string
-          monthly_recurring_revenue: number | null
-          invoice_total: number | null
-          metadata: Record<string, unknown>
-          created_at: string
+          subscriptions: unknown[]
+          invoices: unknown[]
+          payments: unknown[]
+          customer_balance: number | null
+          plan_metadata: Record<string, unknown>
+          source_provider: string | null
           updated_at: string
         }
         Insert: {
-          id?: string
           company_id: string
-          stripe_customer_id?: string | null
-          plan_name?: string | null
-          status?: string
-          monthly_recurring_revenue?: number | null
-          invoice_total?: number | null
-          metadata?: Record<string, unknown>
-          created_at?: string
+          subscriptions?: unknown[]
+          invoices?: unknown[]
+          payments?: unknown[]
+          customer_balance?: number | null
+          plan_metadata?: Record<string, unknown>
+          source_provider?: string | null
           updated_at?: string
         }
-        Update: Partial<Database['public']['Tables']['billing']['Insert']>
+        Update: Partial<Database['public']['Tables']['company_billing']['Insert']>
+        Relationships: []
+      }
+      company_market_data: {
+        Row: {
+          company_id: string
+          competitors: unknown[]
+          pricing_matrix: unknown[]
+          trends: unknown[]
+          opportunities: unknown[]
+          threats: unknown[]
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          competitors?: unknown[]
+          pricing_matrix?: unknown[]
+          trends?: unknown[]
+          opportunities?: unknown[]
+          threats?: unknown[]
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['company_market_data']['Insert']>
+        Relationships: []
       }
       csv_uploads: {
         Row: {
@@ -332,7 +363,7 @@ export interface Database {
           file_name: string
           status: string
           rows_processed: number
-          mapping: Record<string, unknown>
+          target_model: string | null
           error_message: string | null
           created_at: string
           completed_at: string | null
@@ -343,12 +374,13 @@ export interface Database {
           file_name: string
           status?: string
           rows_processed?: number
-          mapping?: Record<string, unknown>
+          target_model?: string | null
           error_message?: string | null
           created_at?: string
           completed_at?: string | null
         }
         Update: Partial<Database['public']['Tables']['csv_uploads']['Insert']>
+        Relationships: []
       }
       audit_logs: {
         Row: {
@@ -370,7 +402,12 @@ export interface Database {
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['audit_logs']['Insert']>
+        Relationships: []
       }
     }
+    Views: Record<string, never>
+    Functions: Record<string, never>
+    Enums: Record<string, never>
+    CompositeTypes: Record<string, never>
   }
 }

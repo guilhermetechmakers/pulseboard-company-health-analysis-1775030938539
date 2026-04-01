@@ -121,6 +121,7 @@ serve(async (req) => {
           provider,
           status: 'connecting',
           cadence: 'daily',
+          scopes: [],
           settings: { oauth_state: state },
         })
       }
@@ -180,6 +181,7 @@ serve(async (req) => {
             provider,
             status: 'connected',
             cadence: 'daily',
+            scopes: [],
           })
           .select('id')
           .single()
@@ -193,7 +195,7 @@ serve(async (req) => {
         .from('integrations')
         .update({
           status: 'connected',
-          scopes: String(tokens.scope ?? ''),
+          scopes: [String(tokens.scope ?? '')],
           last_error: null,
           updated_at: new Date().toISOString(),
         })

@@ -82,7 +82,7 @@ serve(async (req) => {
       .insert({
         company_id: companyId,
         file_name: fileName,
-        status: 'processing',
+        status: 'queued',
         target_model: targetModel,
       })
       .select('id')
