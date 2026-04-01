@@ -529,6 +529,9 @@ export interface Database {
           id: string
           display_name: string | null
           role: string
+          account_status: string
+          email: string | null
+          last_login_at: string | null
           plan_tier: string
           signup_origin: string | null
           privacy_consent_at: string | null
@@ -542,6 +545,9 @@ export interface Database {
           id: string
           display_name?: string | null
           role?: string
+          account_status?: string
+          email?: string | null
+          last_login_at?: string | null
           plan_tier?: string
           signup_origin?: string | null
           privacy_consent_at?: string | null
@@ -552,6 +558,26 @@ export interface Database {
           updated_at?: string
         }
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>
+        Relationships: []
+      }
+      admin_actions: {
+        Row: {
+          id: string
+          admin_id: string
+          action: string
+          target_user_id: string | null
+          metadata: Record<string, unknown>
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          admin_id: string
+          action: string
+          target_user_id?: string | null
+          metadata?: Record<string, unknown>
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['admin_actions']['Insert']>
         Relationships: []
       }
       subscriptions: {

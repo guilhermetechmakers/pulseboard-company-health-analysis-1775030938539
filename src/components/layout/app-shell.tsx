@@ -2,6 +2,7 @@ import type { PropsWithChildren } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { LayoutDashboard, FileText, LogIn, LogOut, UserRound } from 'lucide-react'
 import { useAuth } from '@/contexts/auth-context'
+import { useUserProfile } from '@/hooks/use-auth-profile'
 import { Button } from '@/components/ui/button'
 import { NotificationBell } from '@/components/notifications/notification-bell'
 import { cn } from '@/lib/utils'
@@ -16,7 +17,9 @@ const links = [
 ]
 
 export function AppShell({ children }: PropsWithChildren) {
-  const { session, signOut, isConfigured } = useAuth()
+  const { session, signOut, isConfigured, user } = useAuth()
+  const { data: profile } = useUserProfile(user?.id)
+  const isAdmin = profile?.role === 'admin' && profile?.account_status !== 'suspended'
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -43,6 +46,16 @@ export function AppShell({ children }: PropsWithChildren) {
               <FileText className="h-4 w-4" aria-hidden />
               Report
             </Link>
+            {session && isAdmin ? (
+              <NavLink
+                to="/admin"
+                className={({ isActive }) =>
+                  cn('font-medium transition-colors hover:text-foreground', isActive ? 'text-primary' : 'text-muted-foreground')
+                }
+              >
+                Admin
+              </NavLink>
+            ) : null}
             {session ? (
               <>
                 <NotificationBell />

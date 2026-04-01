@@ -65,12 +65,8 @@ export const SocialBrandPage = () => (
   <PageTemplate title="Social & brand form" description="Channel metrics, engagement cadence, website traffic, and ratings." />
 )
 
-export const AdminUsersPage = () => (
-  <PageTemplate title="Admin user management" description="Filtered user table, suspend/reactivate actions, and migration controls." />
-)
-export const AdminDashboardPage = () => (
-  <PageTemplate title="Admin dashboard" description="Operational metrics, queue visibility, and system error-rate monitoring." />
-)
+export { AdminDashboardPage } from '@/pages/admin-dashboard-page'
+export { AdminUsersPage } from '@/pages/admin-users-page'
 
 export function NotFoundPage() {
   return (

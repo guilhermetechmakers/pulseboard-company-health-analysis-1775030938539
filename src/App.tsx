@@ -28,6 +28,8 @@ import {
   NotFoundPage,
   NotificationsPage,
 } from '@/pages'
+import { AdminOnlyRoute } from '@/components/auth/admin-only-route'
+import { AdminLayout } from '@/components/layout/admin-layout'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -64,7 +66,7 @@ export default function App() {
               <Route path="/dashboard/overview" element={<Guard><DashboardPage /></Guard>} />
               <Route path="/dashboard/analytics" element={<Guard><CompanyDetailPage /></Guard>} />
               <Route path="/dashboard/settings" element={<Guard><SettingsPage /></Guard>} />
-              <Route path="/dashboard/users" element={<Guard><AdminUsersPage /></Guard>} />
+              <Route path="/dashboard/users" element={<Guard><Navigate to="/admin/users" replace /></Guard>} />
               <Route path="/dashboard/projects" element={<Guard><CreateCompanyPage /></Guard>} />
               <Route path="/company/create" element={<Guard><CreateCompanyPage /></Guard>} />
               <Route path="/company" element={<Guard><CompanyDetailPage /></Guard>} />
@@ -79,8 +81,19 @@ export default function App() {
               <Route path="/profile" element={<Guard><UserProfilePage /></Guard>} />
               <Route path="/settings" element={<Guard><SettingsPage /></Guard>} />
               <Route path="/notifications" element={<Guard><NotificationsPage /></Guard>} />
-              <Route path="/admin/users" element={<Guard><AdminUsersPage /></Guard>} />
-              <Route path="/admin" element={<Guard><AdminDashboardPage /></Guard>} />
+              <Route
+                path="/admin"
+                element={
+                  <Guard>
+                    <AdminOnlyRoute>
+                      <AdminLayout />
+                    </AdminOnlyRoute>
+                  </Guard>
+                }
+              >
+                <Route index element={<AdminDashboardPage />} />
+                <Route path="users" element={<AdminUsersPage />} />
+              </Route>
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </AppShell>

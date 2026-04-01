@@ -406,3 +406,37 @@ export async function invokeSendTransactionalEmail(
 
   return { data: json.data ?? {} }
 }
+
+/** Admin platform (metrics, health, users, export). Requires profiles.role = admin. */
+export async function invokeAdminApi(body: Record<string, unknown>): Promise<Record<string, unknown>> {
+  if (!supabase) {
+    throw new Error('Supabase is not configured')
+  }
+  const url = import.meta.env.VITE_SUPABASE_URL
+  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
+  if (!url || !anon) {
+    throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
+  }
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  if (!session?.access_token) {
+    throw new Error('Sign in required')
+  }
+  const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/admin-api`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      apikey: anon,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+  const json = (await res.json()) as Record<string, unknown>
+  if (!res.ok) {
+    const err = json.error
+    const errMsg = typeof err === 'string' ? err : JSON.stringify(err ?? res.status)
+    throw new Error(errMsg)
+  }
+  return json
+}
