@@ -36,7 +36,7 @@ export function useExportJob(exportId: string | undefined) {
     },
     refetchInterval: (q) => {
       const status = q.state.data?.status
-      return status === 'queued' || status === 'processing' ? 2000 : false
+      return status === 'queued' || status === 'processing' ? 2500 : false
     },
   })
 }
@@ -45,17 +45,33 @@ export function useStartReportExport() {
   const queryClient = useQueryClient()
   return useMutation<{ data: ReportExportResponseData }, Error, { reportId: string; values: ExportFormValues }>({
     mutationFn: async (input) => {
+      const v = input.values
       return invokeReportExport({
         reportId: input.reportId,
-        sections: [...input.values.sections],
-        orientation: input.values.orientation,
-        format: input.values.format,
-        primaryColor: input.values.primaryColor,
-        secondaryColor: input.values.secondaryColor,
+        sections: [...v.sections],
+        orientation: v.orientation,
+        pageSize: v.pageSize,
+        format: v.format,
+        primaryColor: v.primaryColor,
+        secondaryColor: v.secondaryColor,
+        branding: {
+          includeLogo: v.includeLogo,
+          logoUrl: null,
+          whiteLabel: v.whiteLabel,
+          colorScheme: null,
+        },
+        delivery: {
+          notifyByEmail: v.notifyByEmail,
+          email: v.notifyByEmail ? v.deliveryEmail.trim() : null,
+        },
       })
     },
     onSuccess: async (res, vars) => {
-      toast.success('Export ready')
+      const st = res?.data?.status
+      if (st === 'queued') {
+        toast.info('Export queued — generating your file…')
+      }
+      /* Completed exports: page shows download + toast after signed URL (sync or poll). */
       await queryClient.invalidateQueries({ queryKey: ['export-jobs', vars.reportId] })
       const exportId = res?.data?.exportId
       if (exportId) {

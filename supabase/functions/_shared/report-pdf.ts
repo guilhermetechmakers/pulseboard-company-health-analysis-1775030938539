@@ -121,9 +121,31 @@ function drawHeading(
   return y - lineHeight * 1.8
 }
 
+export type ReportPdfBuildOptions = {
+  orientation: 'portrait' | 'landscape'
+  pageSize: 'A4' | 'Letter'
+  primaryColor: string
+  secondaryColor: string
+  /** When false, show a small PulseBoard attribution footer on the cover. */
+  whiteLabel: boolean
+  /** Optional logo bytes (PNG or JPEG); embedded below the title when present. */
+  logoBytes?: Uint8Array | null
+  logoMime?: 'image/png' | 'image/jpeg'
+}
+
+function pageDimensions(pageSize: 'A4' | 'Letter', orientation: 'portrait' | 'landscape'): readonly [number, number] {
+  const letterP: readonly [number, number] = [612, 792]
+  const a4P: readonly [number, number] = [595, 842]
+  const base = pageSize === 'A4' ? a4P : letterP
+  if (orientation === 'landscape') {
+    return [base[1], base[0]] as const
+  }
+  return base
+}
+
 export async function buildReportPdfBytes(
   sections: ReportPdfSections,
-  options: { orientation: 'portrait' | 'landscape'; primaryColor: string; secondaryColor: string },
+  options: ReportPdfBuildOptions,
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.create()
   const font = await doc.embedFont(StandardFonts.Helvetica)
@@ -134,12 +156,27 @@ export async function buildReportPdfBytes(
   const secondary = rgb(sRgb.r, sRgb.g, sRgb.b)
   const bodyColor = rgb(0.15, 0.2, 0.25)
 
-  const size = options.orientation === 'landscape' ? ([792, 612] as const) : ([612, 792] as const)
+  const size = pageDimensions(options.pageSize, options.orientation)
   let page = doc.addPage(size)
   const margin = 48
   const maxWidth = page.getWidth() - margin * 2
   const lineHeight = 14
   let y = page.getHeight() - margin
+
+  if (options.logoBytes && options.logoBytes.byteLength > 0) {
+    try {
+      const mime = options.logoMime ?? 'image/png'
+      const embedded =
+        mime === 'image/jpeg' ? await doc.embedJpg(options.logoBytes) : await doc.embedPng(options.logoBytes)
+      const targetW = Math.min(140, maxWidth * 0.35)
+      const scale = targetW / embedded.width
+      const h = embedded.height * scale
+      page.drawImage(embedded, { x: margin, y: y - h, width: targetW, height: h })
+      y -= h + 12
+    } catch {
+      /* skip invalid logo */
+    }
+  }
 
   page.drawText(sections.companyName, { x: margin, y: y - 22, size: 20, font: boldFont, color: primary })
   y -= 36
@@ -172,13 +209,34 @@ export async function buildReportPdfBytes(
     y = res.y - lineHeight
   }
 
+  if (!options.whiteLabel) {
+    const pages = doc.getPages()
+    const last = pages[pages.length - 1]
+    if (last) {
+      last.drawText('Prepared with PulseBoard', {
+        x: margin,
+        y: margin,
+        size: 8,
+        font,
+        color: rgb(0.55, 0.58, 0.62),
+      })
+    }
+  }
+
   return doc.save()
 }
 
-export function buildReportHtmlDocument(
-  sections: ReportPdfSections,
-  options: { orientation: 'portrait' | 'landscape'; primaryColor: string; secondaryColor: string },
-): string {
+export type ReportHtmlBuildOptions = {
+  orientation: 'portrait' | 'landscape'
+  pageSize: 'A4' | 'Letter'
+  primaryColor: string
+  secondaryColor: string
+  whiteLabel: boolean
+  /** data URL for embedded logo (e.g. data:image/png;base64,...) */
+  logoDataUrl?: string | null
+}
+
+export function buildReportHtmlDocument(sections: ReportPdfSections, options: ReportHtmlBuildOptions): string {
   const esc = (s: string) =>
     sanitizeText(s)
       .replace(/&/g, '&amp;')
@@ -192,26 +250,49 @@ export function buildReportHtmlDocument(
       .map((l) => `<li>${esc(l)}</li>`)
       .join('')
 
+  const pageCss =
+    options.pageSize === 'A4'
+      ? options.orientation === 'landscape'
+        ? 'A4 landscape'
+        : 'A4 portrait'
+      : options.orientation === 'landscape'
+        ? 'letter landscape'
+        : 'letter portrait'
+
+  const rawLogo = typeof options.logoDataUrl === 'string' ? options.logoDataUrl.trim() : ''
+  const safeLogo =
+    /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=\r\n]+$/.test(rawLogo) && rawLogo.length < 2_500_000 ? rawLogo : ''
+  const logoBlock = safeLogo ? `<div class="logo-wrap"><img src="${safeLogo}" alt="Company logo" width="160" /></div>` : ''
+
+  const attribution = options.whiteLabel
+    ? ''
+    : '<p class="attribution">Prepared with PulseBoard</p>'
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
 <title>${esc(sections.reportTitle)}</title>
 <style>
-  @page { size: ${options.orientation === 'landscape' ? 'landscape' : 'portrait'}; margin: 18mm; }
+  @page { size: ${pageCss}; margin: 18mm; }
   body { font-family: Inter, system-ui, sans-serif; color: #0f172a; line-height: 1.55; font-size: 14px; }
   h1 { color: ${esc(options.primaryColor)}; font-size: 28px; margin: 0 0 8px; }
   h2 { color: ${esc(options.secondaryColor)}; font-size: 18px; margin: 24px 0 8px; }
   .meta { color: #64748b; font-size: 12px; margin-bottom: 24px; }
+  .attribution { color: #94a3b8; font-size: 11px; margin-top: 4px; }
+  .logo-wrap { margin-bottom: 16px; }
+  .logo-wrap img { max-height: 72px; object-fit: contain; }
   section { margin-bottom: 20px; }
   ul { padding-left: 1.2rem; }
   p { white-space: pre-wrap; }
 </style>
 </head>
 <body>
+  ${logoBlock}
   <h1>${esc(sections.companyName)}</h1>
   <h2>${esc(sections.reportTitle)}</h2>
   <p class="meta">Generated: ${esc(sections.generatedAt)}</p>
+  ${attribution}
   <section><h2>Executive summary</h2><p>${esc(sections.executiveSummary) || '—'}</p></section>
   <section><h2>SWOT</h2><ul>${items(sections.swotLines)}</ul></section>
   <section><h2>Financial analysis</h2><p>${esc(sections.financialAnalysis) || '—'}</p></section>

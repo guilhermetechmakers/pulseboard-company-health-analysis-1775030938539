@@ -854,6 +854,7 @@ export interface Database {
           export_params: Record<string, unknown>
           storage_path: string | null
           error_message: string | null
+          file_size_bytes: number | null
           created_at: string
           updated_at: string
         }
@@ -867,6 +868,7 @@ export interface Database {
           export_params?: Record<string, unknown>
           storage_path?: string | null
           error_message?: string | null
+          file_size_bytes?: number | null
           created_at?: string
           updated_at?: string
         }

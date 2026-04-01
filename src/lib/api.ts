@@ -80,6 +80,9 @@ export { invokePulseSearch } from '@/lib/pulse-search-api'
 export {
   invokeAnalyzeCompanyHealth,
   invokeReportExport,
+  fetchReportExportContext,
+  fetchReportExportStatus,
+  sendReportExportEmail,
   invokeExportDownloadUrl,
   invokeEmailSend,
   invokeEmailRetry,
@@ -89,6 +92,7 @@ export {
   invokePulseDashboardApi,
   invokePulseActiveCompany,
   invokePulseReportViewerApi,
+  invokePulseReportExportApi,
   invokePulseAnalysesApi,
   invokePulseNotificationsTrigger,
   pulseDataIoImportCsv,

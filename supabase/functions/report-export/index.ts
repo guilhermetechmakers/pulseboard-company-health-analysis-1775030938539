@@ -1,6 +1,7 @@
 /**
- * PulseBoard — server-side report export (PDF/HTML) with queued status on export_jobs.
- * Requires SUPABASE_SERVICE_ROLE_KEY for storage upload and job writes; verifies JWT + company ownership.
+ * PulseBoard — server-side report export (PDF/HTML) with queued jobs on export_jobs.
+ * Uses EdgeRuntime.waitUntil when available so the client can poll status while generation runs.
+ * Requires SUPABASE_SERVICE_ROLE_KEY; verifies JWT + company ownership.
  */
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -23,15 +24,43 @@ const sectionKeySchema = z.enum([
   'actions',
 ])
 
+const brandingSchema = z.object({
+  includeLogo: z.boolean().default(false),
+  logoUrl: z.string().url().optional().nullable(),
+  whiteLabel: z.boolean().default(false),
+  colorScheme: z.string().max(64).optional().nullable(),
+})
+
+const deliverySchema = z.object({
+  email: z.string().email().optional().nullable(),
+  notifyByEmail: z.boolean().default(false),
+})
+
 const requestSchema = z.object({
   reportId: z.string().uuid(),
   sections: z.array(sectionKeySchema).min(1),
   orientation: z.enum(['portrait', 'landscape']).default('portrait'),
+  pageSize: z.enum(['A4', 'Letter']).default('A4'),
   format: z.enum(['pdf', 'html']).default('pdf'),
   primaryColor: z.string().optional(),
   secondaryColor: z.string().optional(),
   language: z.string().optional(),
+  branding: brandingSchema.default({ includeLogo: false, whiteLabel: false }),
+  delivery: deliverySchema.default({ notifyByEmail: false }),
 })
+
+function edgeRuntimeWaitUntil(): { waitUntil: (p: Promise<unknown>) => void } | undefined {
+  return (globalThis as unknown as { EdgeRuntime?: { waitUntil: (p: Promise<unknown>) => void } }).EdgeRuntime
+}
+
+function uint8ToBase64(u8: Uint8Array): string {
+  const chunkSize = 0x8000
+  let s = ''
+  for (let i = 0; i < u8.length; i += chunkSize) {
+    s += String.fromCharCode.apply(null, u8.subarray(i, i + chunkSize) as unknown as number[])
+  }
+  return btoa(s)
+}
 
 function swotToLines(swot: unknown): string[] {
   const o = asRecord(swot)
@@ -105,6 +134,12 @@ function buildSectionsPayload(
   }
 }
 
+function logoMimeFromPath(path: string): 'image/png' | 'image/jpeg' {
+  const p = path.toLowerCase()
+  if (p.endsWith('.jpg') || p.endsWith('.jpeg')) return 'image/jpeg'
+  return 'image/png'
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -154,7 +189,8 @@ serve(async (req) => {
       })
     }
 
-    const { reportId, sections, orientation, format, primaryColor, secondaryColor, language } = parsed.data
+    const { reportId, sections, orientation, pageSize, format, primaryColor, secondaryColor, language, branding, delivery } =
+      parsed.data
     const included = new Set(sections)
 
     const { data: report, error: reportError } = await userClient.from('reports').select('*').eq('id', reportId).maybeSingle()
@@ -191,23 +227,51 @@ serve(async (req) => {
 
     const admin = createClient(supabaseUrl, serviceKey)
 
-    const { data: branding } = await admin.from('company_branding').select('*').eq('company_id', companyId).maybeSingle()
-    const brand = branding ? asRecord(branding as Record<string, unknown>) : {}
+    const { data: profile } = await admin.from('profiles').select('plan_tier').eq('id', user.id).maybeSingle()
+    const tierRaw = profile && typeof (profile as { plan_tier?: string }).plan_tier === 'string'
+      ? (profile as { plan_tier: string }).plan_tier
+      : 'starter'
+    const whiteLabelAllowed = tierRaw === 'pro' || tierRaw === 'agency'
+    const whiteLabel = Boolean(branding.whiteLabel && whiteLabelAllowed)
+
+    const { data: companyBrandRow } = await admin.from('company_branding').select('*').eq('company_id', companyId).maybeSingle()
+    const brand = companyBrandRow ? asRecord(companyBrandRow as Record<string, unknown>) : {}
     const primary =
-      primaryColor ??
-      (typeof brand.primary_color === 'string' ? brand.primary_color : '#0B6AF7')
+      primaryColor ?? (typeof brand.primary_color === 'string' ? brand.primary_color : '#0B6AF7')
     const secondary =
-      secondaryColor ??
-      (typeof brand.secondary_color === 'string' ? brand.secondary_color : '#064FD6')
+      secondaryColor ?? (typeof brand.secondary_color === 'string' ? brand.secondary_color : '#064FD6')
+    const logoPath = typeof brand.logo_storage_path === 'string' ? brand.logo_storage_path.trim() : ''
+
+    if (branding.includeLogo && !logoPath) {
+      return new Response(
+        JSON.stringify({
+          error: 'Upload a company logo in export settings before including it in the PDF.',
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+
+    if (delivery.notifyByEmail) {
+      const em = typeof delivery.email === 'string' ? delivery.email.trim() : ''
+      if (!em || !em.includes('@')) {
+        return new Response(JSON.stringify({ error: 'Provide a valid delivery email when email export is enabled.' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+    }
 
     const exportId = crypto.randomUUID()
     const exportParams = {
       sections,
       orientation,
+      pageSize,
       format,
       primaryColor: primary,
       secondaryColor: secondary,
       language: language ?? 'en',
+      branding: { ...branding, whiteLabel },
+      delivery: delivery.notifyByEmail ? { email: delivery.email, notifyByEmail: true } : { notifyByEmail: false },
     }
 
     const { error: insertError } = await admin.from('export_jobs').insert({
@@ -216,8 +280,8 @@ serve(async (req) => {
       report_id: reportId,
       initiated_by: user.id,
       export_params: exportParams,
-      status: 'processing',
-      progress: 10,
+      status: 'queued',
+      progress: 0,
       updated_at: new Date().toISOString(),
     })
 
@@ -228,127 +292,215 @@ serve(async (req) => {
       })
     }
 
-    try {
-      await admin
-        .from('export_jobs')
-        .update({ progress: 35, updated_at: new Date().toISOString() })
-        .eq('id', exportId)
+    const runExport = async () => {
+      try {
+        await admin
+          .from('export_jobs')
+          .update({ status: 'processing', progress: 10, updated_at: new Date().toISOString() })
+          .eq('id', exportId)
 
-      const sectionsPayload = buildSectionsPayload(reportRow, companyName, included)
+        let logoBytes: Uint8Array | null = null
+        let logoMime: 'image/png' | 'image/jpeg' = 'image/png'
+        if (branding.includeLogo && logoPath) {
+          const dl = await admin.storage.from('branding-assets').download(logoPath)
+          if (!dl.error && dl.data) {
+            const ab = await dl.data.arrayBuffer()
+            logoBytes = new Uint8Array(ab)
+            logoMime = logoMimeFromPath(logoPath)
+          }
+        }
 
-      const ext = format === 'html' ? 'html' : 'pdf'
-      const storagePath = `reports/${companyId}/${reportId}/${exportId}.${ext}`
-      const contentType = format === 'html' ? 'text/html' : 'application/pdf'
+        await admin
+          .from('export_jobs')
+          .update({ progress: 35, updated_at: new Date().toISOString() })
+          .eq('id', exportId)
 
-      let body: Uint8Array
-      if (format === 'html') {
-        const html = buildReportHtmlDocument(sectionsPayload, { orientation, primaryColor: primary, secondaryColor: secondary })
-        body = new TextEncoder().encode(html)
-      } else {
-        body = await buildReportPdfBytes(sectionsPayload, {
-          orientation,
-          primaryColor: primary,
-          secondaryColor: secondary,
+        const sectionsPayload = buildSectionsPayload(reportRow, companyName, included)
+
+        const ext = format === 'html' ? 'html' : 'pdf'
+        const storagePath = `reports/${companyId}/${reportId}/${exportId}.${ext}`
+        const contentType = format === 'html' ? 'text/html' : 'application/pdf'
+
+        let logoDataUrl: string | null = null
+        const lowerPath = logoPath.toLowerCase()
+        const canEmbedRaster =
+          lowerPath.endsWith('.png') || lowerPath.endsWith('.jpg') || lowerPath.endsWith('.jpeg')
+        if (format === 'html' && logoBytes !== null && logoBytes.byteLength > 0 && canEmbedRaster) {
+          const b64 = uint8ToBase64(logoBytes)
+          const prefix = logoMime === 'image/jpeg' ? 'data:image/jpeg;base64,' : 'data:image/png;base64,'
+          logoDataUrl = `${prefix}${b64}`
+        }
+
+        let body: Uint8Array
+        if (format === 'html') {
+          const html = buildReportHtmlDocument(sectionsPayload, {
+            orientation,
+            pageSize,
+            primaryColor: primary,
+            secondaryColor: secondary,
+            whiteLabel,
+            logoDataUrl,
+          })
+          body = new TextEncoder().encode(html)
+        } else {
+          body = await buildReportPdfBytes(sectionsPayload, {
+            orientation,
+            pageSize,
+            primaryColor: primary,
+            secondaryColor: secondary,
+            whiteLabel,
+            logoBytes,
+            logoMime,
+          })
+        }
+
+        await admin
+          .from('export_jobs')
+          .update({ progress: 70, updated_at: new Date().toISOString() })
+          .eq('id', exportId)
+
+        const upload = await admin.storage.from('report-exports').upload(storagePath, body, {
+          contentType,
+          upsert: true,
+        })
+
+        if (upload.error) {
+          throw new Error(upload.error.message)
+        }
+
+        const fileSize = body.byteLength
+
+        await admin
+          .from('export_jobs')
+          .update({
+            status: 'completed',
+            progress: 100,
+            storage_path: storagePath,
+            file_size_bytes: fileSize,
+            error_message: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', exportId)
+
+        await admin.from('user_activity_logs').insert({
+          user_id: user.id,
+          action: 'report_exported',
+          metadata: { exportId, reportId, companyId, format, orientation, pageSize, whiteLabel },
+        })
+
+        const signed = await admin.storage.from('report-exports').createSignedUrl(storagePath, 3600)
+        const exportUrl = signed.data?.signedUrl ?? ''
+
+        await createUserNotification(admin, {
+          userId: user.id,
+          type: 'export_ready',
+          message: `Export for ${companyName} is ready (${format.toUpperCase()}). Download from the export screen.`,
+          data: { exportId, reportId, companyId, format, signedUrl: exportUrl },
+        })
+
+        const exportDisplayName =
+          typeof user.user_metadata?.display_name === 'string'
+            ? user.user_metadata.display_name
+            : typeof user.email === 'string'
+              ? user.email.split('@')[0] ?? 'there'
+              : 'there'
+        const appUrl = (Deno.env.get('PUBLIC_APP_URL') ?? Deno.env.get('SITE_URL') ?? '').replace(/\/$/, '')
+        const exportPage = appUrl ? `${appUrl}/export/${reportId}` : `/export/${reportId}`
+        await sendTemplatedEmailIfEnabled({
+          admin,
+          userId: user.id,
+          templateType: 'export_ready',
+          placeholders: {
+            userName: exportDisplayName,
+            companyName,
+            exportUrl: exportUrl || exportPage,
+          },
+          metadata: { exportId, reportId, companyId },
+        })
+
+        if (delivery.notifyByEmail && typeof delivery.email === 'string' && delivery.email.includes('@')) {
+          await sendTemplatedEmailIfEnabled({
+            admin,
+            userId: user.id,
+            templateType: 'export_ready',
+            placeholders: {
+              userName: delivery.email.split('@')[0] ?? 'there',
+              companyName,
+              exportUrl: exportUrl || exportPage,
+            },
+            metadata: { exportId, reportId, companyId, deliveryCopy: true },
+            toOverride: delivery.email.trim(),
+          })
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Export failed'
+        await admin
+          .from('export_jobs')
+          .update({
+            status: 'failed',
+            progress: 0,
+            error_message: message,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', exportId)
+
+        await createUserNotification(admin, {
+          userId: user.id,
+          type: 'job_failed',
+          message: `Report export failed: ${message}`,
+          data: { exportId, reportId, companyId, error: message },
         })
       }
+    }
 
-      await admin
-        .from('export_jobs')
-        .update({ progress: 70, updated_at: new Date().toISOString() })
-        .eq('id', exportId)
-
-      const upload = await admin.storage.from('report-exports').upload(storagePath, body, {
-        contentType,
-        upsert: true,
-      })
-
-      if (upload.error) {
-        throw new Error(upload.error.message)
-      }
-
-      await admin
-        .from('export_jobs')
-        .update({
-          status: 'completed',
-          progress: 100,
-          storage_path: storagePath,
-          error_message: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', exportId)
-
-      await admin.from('user_activity_logs').insert({
-        user_id: user.id,
-        action: 'report_exported',
-        metadata: { exportId, reportId, companyId, format, orientation },
-      })
-
-      const signed = await admin.storage.from('report-exports').createSignedUrl(storagePath, 3600)
-      const exportUrl = signed.data?.signedUrl ?? ''
-
-      await createUserNotification(admin, {
-        userId: user.id,
-        type: 'export_ready',
-        message: `Export for ${companyName} is ready (${format.toUpperCase()}). Download from the export screen.`,
-        data: { exportId, reportId, companyId, format, signedUrl: exportUrl },
-      })
-
-      const exportDisplayName =
-        typeof user.user_metadata?.display_name === 'string'
-          ? user.user_metadata.display_name
-          : typeof user.email === 'string'
-            ? user.email.split('@')[0] ?? 'there'
-            : 'there'
-      const appUrl = (Deno.env.get('PUBLIC_APP_URL') ?? Deno.env.get('SITE_URL') ?? '').replace(/\/$/, '')
-      const exportPage = appUrl ? `${appUrl}/export/${reportId}` : `/export/${reportId}`
-      await sendTemplatedEmailIfEnabled({
-        admin,
-        userId: user.id,
-        templateType: 'export_ready',
-        placeholders: {
-          userName: exportDisplayName,
-          companyName,
-          exportUrl: exportUrl || exportPage,
-        },
-        metadata: { exportId, reportId, companyId },
-      })
-
+    const edgeRt = edgeRuntimeWaitUntil()
+    if (edgeRt?.waitUntil) {
+      edgeRt.waitUntil(runExport())
       return new Response(
         JSON.stringify({
           data: {
             exportId,
-            status: 'completed',
-            storagePath,
-            signedUrl: signed.data?.signedUrl ?? null,
+            status: 'queued',
+            progress: 0,
+            storagePath: null,
+            signedUrl: null,
             format,
+            message: 'Export queued — status updates in export jobs.',
           },
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        { status: 202, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       )
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Export failed'
-      await admin
-        .from('export_jobs')
-        .update({
-          status: 'failed',
-          progress: 0,
-          error_message: message,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', exportId)
+    }
 
-      await createUserNotification(admin, {
-        userId: user.id,
-        type: 'job_failed',
-        message: `Report export failed: ${message}`,
-        data: { exportId, reportId, companyId, error: message },
-      })
+    await runExport()
 
-      return new Response(JSON.stringify({ error: message, exportId }), {
+    const { data: finalJob } = await admin.from('export_jobs').select('status, storage_path, error_message').eq('id', exportId).maybeSingle()
+    const fj = finalJob ? asRecord(finalJob as Record<string, unknown>) : {}
+    const finalStatus = typeof fj.status === 'string' ? fj.status : 'failed'
+    if (finalStatus !== 'completed') {
+      const em = typeof fj.error_message === 'string' ? fj.error_message : 'Export failed'
+      return new Response(JSON.stringify({ error: em, exportId }), {
         status: 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+
+    const sp = typeof fj.storage_path === 'string' ? fj.storage_path : ''
+    const signed = await admin.storage.from('report-exports').createSignedUrl(sp, 3600)
+
+    return new Response(
+      JSON.stringify({
+        data: {
+          exportId,
+          status: 'completed',
+          progress: 100,
+          storagePath: sp,
+          signedUrl: signed.data?.signedUrl ?? null,
+          format,
+        },
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    )
   } catch (error) {
     return new Response(JSON.stringify({ error: (error as Error).message }), {
       status: 500,

@@ -7,7 +7,13 @@ import type {
   AnalysisJobStatusPayload,
 } from '@/types/analysis'
 import type { DashboardOverviewResponse } from '@/types/dashboard'
-import type { ExportDownloadUrlResponseData, ReportExportResponseData } from '@/types/export'
+import type {
+  ExportContextResponseData,
+  ExportDownloadUrlResponseData,
+  ExportEmailResponseData,
+  ExportStatusResponseData,
+  ReportExportResponseData,
+} from '@/types/export'
 import type {
   PulseDataIoExportDownloadResponse,
   PulseDataIoExportResponse,
@@ -388,10 +394,21 @@ export interface ReportExportRequestBody {
   reportId: string
   sections: string[]
   orientation: 'portrait' | 'landscape'
+  pageSize: 'A4' | 'Letter'
   format: 'pdf' | 'html'
   primaryColor?: string
   secondaryColor?: string
   language?: string
+  branding: {
+    includeLogo: boolean
+    logoUrl?: string | null
+    whiteLabel: boolean
+    colorScheme?: string | null
+  }
+  delivery: {
+    email?: string | null
+    notifyByEmail: boolean
+  }
 }
 
 export async function invokeReportExport(
@@ -418,7 +435,53 @@ export async function invokeReportExport(
     body: JSON.stringify(body),
   })
 
-  const json = (await res.json()) as { data?: ReportExportResponseData; error?: unknown }
+  const raw = (await res.json()) as { data?: ReportExportResponseData; error?: unknown }
+
+  if (!res.ok && res.status !== 202) {
+    const errMsg =
+      typeof raw.error === 'string'
+        ? raw.error
+        : raw.error !== undefined
+          ? JSON.stringify(raw.error)
+          : `Export request failed (${res.status})`
+    throw new Error(errMsg)
+  }
+
+  if (!raw.data?.exportId) {
+    throw new Error('Invalid response from export service')
+  }
+
+  return { data: raw.data }
+}
+
+export type PulseReportExportApiBody =
+  | { op: 'export_context'; reportId: string }
+  | { op: 'export_status'; reportId: string; exportId: string }
+  | { op: 'export_email'; reportId: string; exportId: string; email: string }
+
+export async function invokePulseReportExportApi<T>(body: PulseReportExportApiBody): Promise<T> {
+  if (!supabase) {
+    throw new Error('Supabase is not configured')
+  }
+
+  const baseUrl = import.meta.env.VITE_SUPABASE_URL
+  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
+  if (!baseUrl || !anon) {
+    throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
+  }
+
+  const headers = await buildAuthenticatedEdgeHeaders()
+  if (!headers.Authorization?.startsWith('Bearer ')) {
+    throw new Error('Sign in required')
+  }
+
+  const res = await fetch(`${baseUrl.replace(/\/$/, '')}/functions/v1/pulse-report-export-api`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  })
+
+  const json = (await res.json()) as { data?: T; error?: unknown }
 
   if (!res.ok) {
     const errMsg =
@@ -426,15 +489,50 @@ export async function invokeReportExport(
         ? json.error
         : json.error !== undefined
           ? JSON.stringify(json.error)
-          : `Export request failed (${res.status})`
+          : `pulse-report-export-api failed (${res.status})`
     throw new Error(errMsg)
   }
 
-  if (!json.data?.exportId) {
-    throw new Error('Invalid response from export service')
+  if (json.error !== null && json.error !== undefined && json.error !== '') {
+    throw new Error(typeof json.error === 'string' ? json.error : JSON.stringify(json.error))
   }
 
-  return json as { data: ReportExportResponseData }
+  if (json.data === undefined) {
+    throw new Error('Invalid response from pulse-report-export-api')
+  }
+
+  return json.data as T
+}
+
+export async function fetchReportExportContext(reportId: string): Promise<ExportContextResponseData> {
+  return invokePulseReportExportApi<ExportContextResponseData>({
+    op: 'export_context',
+    reportId,
+  })
+}
+
+export async function fetchReportExportStatus(
+  reportId: string,
+  exportId: string,
+): Promise<ExportStatusResponseData> {
+  return invokePulseReportExportApi<ExportStatusResponseData>({
+    op: 'export_status',
+    reportId,
+    exportId,
+  })
+}
+
+export async function sendReportExportEmail(input: {
+  reportId: string
+  exportId: string
+  email: string
+}): Promise<ExportEmailResponseData> {
+  return invokePulseReportExportApi<ExportEmailResponseData>({
+    op: 'export_email',
+    reportId: input.reportId,
+    exportId: input.exportId,
+    email: input.email,
+  })
 }
 
 export async function invokeExportDownloadUrl(input: {

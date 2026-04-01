@@ -1,41 +1,41 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import { Download, FileDown, ImagePlus, Loader2, Palette } from 'lucide-react'
+import { Download, FileDown, Loader2, Palette } from 'lucide-react'
 import { PageTemplate } from '@/components/layout/page-template'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Progress } from '@/components/ui/progress'
-import { Badge, type BadgeProps } from '@/components/ui/badge'
+import { Switch } from '@/components/ui/switch'
+import { ExportBrandingUploader } from '@/components/export-settings/export-branding-uploader'
+import {
+  ExportProgressIndicator,
+  type ExportProgressPhase,
+} from '@/components/export-settings/export-progress-indicator'
+import { ExportDownloadPanel } from '@/components/export-settings/export-download-panel'
+import { ExportEmailPanel } from '@/components/export-settings/export-email-panel'
+import { ExportSummaryPanel } from '@/components/export-settings/export-summary-panel'
 import { useReport } from '@/hooks/use-analysis'
 import { useMyCompany } from '@/hooks/use-my-company'
 import { useCompanyBranding, useUpsertCompanyBranding } from '@/hooks/use-company-branding'
-import { useExportJobsForReport, useRefreshExportDownloadUrl, useStartReportExport } from '@/hooks/use-export-jobs'
+import { useExportContextQuery } from '@/hooks/use-export-context'
+import { useExportJob, useExportJobsForReport, useRefreshExportDownloadUrl, useStartReportExport } from '@/hooks/use-export-jobs'
 import { supabase } from '@/lib/supabase'
+import { invokeExportDownloadUrl } from '@/lib/supabase-functions'
 import {
   EXPORT_SECTION_KEYS,
   exportFormSchema,
   type ExportFormValues,
   type ExportSectionKey,
 } from '@/lib/export-schema'
+import { EXPORT_SECTION_LABELS } from '@/lib/export-section-labels'
 import { cn } from '@/lib/utils'
 import type { ExportJobRow } from '@/types/export'
-
-const SECTION_LABELS: Record<ExportSectionKey, string> = {
-  executiveSummary: 'Executive summary',
-  swot: 'SWOT',
-  financial: 'Financial analysis',
-  market: 'Market analysis',
-  social: 'Social & brand',
-  risks: 'Top risks',
-  opportunities: 'Opportunities',
-  actions: 'Action plan',
-}
+import { Badge, type BadgeProps } from '@/components/ui/badge'
 
 function asStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return []
@@ -51,10 +51,26 @@ function prefsFromBranding(exportPreferences: Record<string, unknown> | undefine
   const sectionsRaw = raw.sections
   const sections = asStringArray(sectionsRaw).filter(isExportSectionKey)
   const orientation = raw.orientation === 'landscape' || raw.orientation === 'portrait' ? raw.orientation : undefined
+  const pageSize = raw.pageSize === 'Letter' || raw.pageSize === 'A4' ? raw.pageSize : undefined
   const format = raw.format === 'html' || raw.format === 'pdf' ? raw.format : undefined
   const primaryColor = typeof raw.primaryColor === 'string' ? raw.primaryColor : undefined
   const secondaryColor = typeof raw.secondaryColor === 'string' ? raw.secondaryColor : undefined
-  return { sections, orientation, format, primaryColor, secondaryColor }
+  const includeLogo = typeof raw.includeLogo === 'boolean' ? raw.includeLogo : undefined
+  const whiteLabel = typeof raw.whiteLabel === 'boolean' ? raw.whiteLabel : undefined
+  const notifyByEmail = typeof raw.notifyByEmail === 'boolean' ? raw.notifyByEmail : undefined
+  const deliveryEmail = typeof raw.deliveryEmail === 'string' ? raw.deliveryEmail : undefined
+  return {
+    sections,
+    orientation,
+    pageSize,
+    format,
+    primaryColor,
+    secondaryColor,
+    includeLogo,
+    whiteLabel,
+    notifyByEmail,
+    deliveryEmail,
+  }
 }
 
 function statusBadgeVariant(status: string): NonNullable<BadgeProps['variant']> {
@@ -83,6 +99,7 @@ export function ExportSettingsPage() {
   const companyId = company?.id
   const { data: report, isLoading: reportLoading, error: reportError } = useReport(reportId)
   const { data: branding, isLoading: brandingLoading } = useCompanyBranding(companyId)
+  const { data: exportContext, isLoading: exportContextLoading } = useExportContextQuery(reportId)
   const upsertBranding = useUpsertCompanyBranding()
   const startExport = useStartReportExport()
   const refreshUrl = useRefreshExportDownloadUrl()
@@ -92,15 +109,23 @@ export function ExportSettingsPage() {
 
   const [signedDownloadUrl, setSignedDownloadUrl] = useState<string | null>(null)
   const [lastExportId, setLastExportId] = useState<string | null>(null)
+  const [pollExportId, setPollExportId] = useState<string | null>(null)
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null)
+  const [completedFileSize, setCompletedFileSize] = useState<number | null>(null)
+  const pollCompleteHandled = useRef<string | null>(null)
 
   const defaultValues = useMemo<ExportFormValues>(
     () => ({
       sections: [...EXPORT_SECTION_KEYS],
       orientation: 'portrait',
+      pageSize: 'A4',
       format: 'pdf',
       primaryColor: '#0B6AF7',
       secondaryColor: '#064FD6',
+      includeLogo: false,
+      whiteLabel: false,
+      notifyByEmail: false,
+      deliveryEmail: '',
     }),
     [],
   )
@@ -113,15 +138,22 @@ export function ExportSettingsPage() {
   const { handleSubmit, watch, setValue, reset, formState } = form
   const watched = watch()
 
+  const { data: polledJob } = useExportJob(pollExportId ?? undefined)
+
   useEffect(() => {
     if (!branding) return
     const prefs = prefsFromBranding(branding.export_preferences ?? {})
     reset({
       sections: prefs.sections?.length ? prefs.sections : [...EXPORT_SECTION_KEYS],
       orientation: prefs.orientation ?? 'portrait',
+      pageSize: prefs.pageSize ?? 'A4',
       format: prefs.format ?? 'pdf',
       primaryColor: prefs.primaryColor ?? branding.primary_color ?? '#0B6AF7',
       secondaryColor: prefs.secondaryColor ?? branding.secondary_color ?? '#064FD6',
+      includeLogo: prefs.includeLogo ?? false,
+      whiteLabel: prefs.whiteLabel ?? false,
+      notifyByEmail: prefs.notifyByEmail ?? false,
+      deliveryEmail: prefs.deliveryEmail ?? '',
     })
   }, [branding, reset])
 
@@ -147,6 +179,65 @@ export function ExportSettingsPage() {
     }
   }, [branding?.logo_storage_path])
 
+  useEffect(() => {
+    if (!polledJob || polledJob.status !== 'completed') return
+    if (pollCompleteHandled.current === polledJob.id) return
+    pollCompleteHandled.current = polledJob.id
+    const idJob = polledJob.id
+    void (async () => {
+      try {
+        const r = await invokeExportDownloadUrl({ exportId: idJob, expiresIn: 7200 })
+        setSignedDownloadUrl(r.data.signedUrl)
+        setPollExportId(null)
+        const sz =
+          typeof polledJob.file_size_bytes === 'number' && Number.isFinite(polledJob.file_size_bytes)
+            ? polledJob.file_size_bytes
+            : null
+        setCompletedFileSize(sz)
+        toast.success('Export ready')
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Could not get download URL')
+      }
+    })()
+  }, [polledJob])
+
+  useEffect(() => {
+    if (polledJob?.status !== 'failed') return
+    toast.error(typeof polledJob.error_message === 'string' ? polledJob.error_message : 'Export failed')
+    setPollExportId(null)
+  }, [polledJob?.status, polledJob?.error_message])
+
+  const progressPhase: ExportProgressPhase = useMemo(() => {
+    if (startExport.isPending) return 'submitting'
+    if (polledJob?.status === 'failed') return 'failed'
+    if (polledJob?.status === 'queued') return 'queued'
+    if (polledJob?.status === 'processing') return 'processing'
+    if (signedDownloadUrl) return 'completed'
+    return 'idle'
+  }, [startExport.isPending, polledJob?.status, signedDownloadUrl])
+
+  const progressPercent = useMemo(() => {
+    if (startExport.isPending) return 22
+    if (polledJob?.status === 'queued') return 18
+    if (polledJob?.status === 'processing') {
+      const p = typeof polledJob.progress === 'number' ? polledJob.progress : 40
+      return Math.min(95, Math.max(30, p))
+    }
+    if (signedDownloadUrl) return 100
+    return 0
+  }, [startExport.isPending, polledJob?.status, polledJob?.progress, signedDownloadUrl])
+
+  const statusLabel = useMemo(() => {
+    if (startExport.isPending) return 'Submitting…'
+    if (polledJob?.status === 'queued') return 'Queued'
+    if (polledJob?.status === 'processing') return 'In progress'
+    if (polledJob?.status === 'failed') return 'Failed'
+    if (signedDownloadUrl) return 'Completed'
+    return 'Idle'
+  }, [startExport.isPending, polledJob?.status, signedDownloadUrl])
+
+  const whiteLabelAllowed = exportContext?.whiteLabelAllowed === true
+
   const toggleSection = (key: ExportSectionKey) => {
     const cur = form.getValues('sections') ?? []
     const next = cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]
@@ -164,9 +255,14 @@ export function ExportSettingsPage() {
         export_preferences: {
           sections: values.sections,
           orientation: values.orientation,
+          pageSize: values.pageSize,
           format: values.format,
           primaryColor: values.primaryColor,
           secondaryColor: values.secondaryColor,
+          includeLogo: values.includeLogo,
+          whiteLabel: values.whiteLabel,
+          notifyByEmail: values.notifyByEmail,
+          deliveryEmail: values.deliveryEmail,
         },
       },
     })
@@ -189,10 +285,30 @@ export function ExportSettingsPage() {
 
   const onSubmit = handleSubmit(async (values) => {
     if (!reportId) return
+    if (values.includeLogo && !branding?.logo_storage_path) {
+      toast.error('Upload a logo first, or turn off “Include logo in export”.')
+      return
+    }
+    if (exportContext?.whiteLabelAllowed === false && values.whiteLabel) {
+      setValue('whiteLabel', false)
+      toast.error('White-label is not available on your plan.')
+      return
+    }
+    pollCompleteHandled.current = null
     const res = await startExport.mutateAsync({ reportId, values })
-    const url = res.data.signedUrl ?? null
-    setSignedDownloadUrl(url)
-    setLastExportId(res.data.exportId)
+    const d = res?.data
+    if (!d?.exportId) return
+    setLastExportId(d.exportId)
+    if (d.status === 'completed' && d.signedUrl) {
+      setSignedDownloadUrl(d.signedUrl)
+      setPollExportId(null)
+      setCompletedFileSize(null)
+      toast.success('Export ready')
+    } else {
+      setSignedDownloadUrl(null)
+      setCompletedFileSize(null)
+      setPollExportId(d.exportId)
+    }
   })
 
   const onRefreshDownload = async () => {
@@ -222,9 +338,9 @@ export function ExportSettingsPage() {
     )
   }
 
-  if (reportLoading || brandingLoading) {
+  if (reportLoading || brandingLoading || exportContextLoading) {
     return (
-      <PageTemplate title="Preparing export" description="Loading report and branding.">
+      <PageTemplate title="Preparing export" description="Loading report, branding, and export options.">
         <div className="h-40 animate-pulse rounded-xl bg-muted motion-reduce:animate-none" />
       </PageTemplate>
     )
@@ -244,7 +360,7 @@ export function ExportSettingsPage() {
   return (
     <PageTemplate
       title="Export & PDF settings"
-      description="Choose sections, branding, and format. Exports are generated server-side and stored securely."
+      description="Choose sections, branding, page size, and delivery. Exports are generated server-side with queue support."
     >
       <div className="mb-6 flex flex-wrap gap-2 no-print">
         <Button asChild variant="secondary">
@@ -282,14 +398,14 @@ export function ExportSettingsPage() {
                   return (
                     <label
                       key={key}
-                      className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/40"
+                      className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3 transition-colors duration-200 hover:bg-muted/40"
                     >
                       <Checkbox
                         checked={checked}
                         onCheckedChange={() => toggleSection(key)}
-                        aria-label={SECTION_LABELS[key]}
+                        aria-label={EXPORT_SECTION_LABELS[key]}
                       />
-                      <span className="text-sm font-medium leading-none">{SECTION_LABELS[key]}</span>
+                      <span className="text-sm font-medium leading-none">{EXPORT_SECTION_LABELS[key]}</span>
                     </label>
                   )
                 })}
@@ -321,23 +437,79 @@ export function ExportSettingsPage() {
                 </select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="format">Format</Label>
+                <Label htmlFor="pageSize">Page size</Label>
                 <select
-                  id="format"
+                  id="pageSize"
                   className={cn(
                     'flex h-10 w-full rounded-lg border border-input bg-background px-3 text-sm',
                     'ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   )}
-                  value={watched.format}
+                  value={watched.pageSize}
                   onChange={(e) =>
-                    setValue('format', e.target.value === 'html' ? 'html' : 'pdf', { shouldValidate: true })
+                    setValue('pageSize', e.target.value === 'Letter' ? 'Letter' : 'A4', { shouldValidate: true })
                   }
-                  aria-label="Export file format"
+                  aria-label="Page size"
                 >
-                  <option value="pdf">PDF</option>
-                  <option value="html">HTML (fallback)</option>
+                  <option value="A4">A4</option>
+                  <option value="Letter">US Letter</option>
                 </select>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="format">File format</Label>
+              <select
+                id="format"
+                className={cn(
+                  'max-w-md flex h-10 w-full rounded-lg border border-input bg-background px-3 text-sm',
+                  'ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                )}
+                value={watched.format}
+                onChange={(e) =>
+                  setValue('format', e.target.value === 'html' ? 'html' : 'pdf', { shouldValidate: true })
+                }
+                aria-label="Export file format"
+              >
+                <option value="pdf">PDF</option>
+                <option value="html">HTML (print-friendly)</option>
+              </select>
+              <p className="text-xs text-muted-foreground">PDF is the default client deliverable; HTML is a fallback for accessibility tooling.</p>
+            </div>
+
+            <div className="space-y-4 rounded-lg border border-border/80 bg-muted/20 p-4">
+              <p className="text-sm font-medium">Branding</p>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-1">
+                  <Label htmlFor="include-logo" className="text-sm font-medium">
+                    Include logo in export
+                  </Label>
+                  <p className="text-xs text-muted-foreground">Uses your saved company logo in the document header.</p>
+                </div>
+                <Switch
+                  id="include-logo"
+                  checked={watched.includeLogo}
+                  onCheckedChange={(c) => setValue('includeLogo', Boolean(c), { shouldValidate: true })}
+                  aria-label="Include company logo in export"
+                />
+              </div>
+              {whiteLabelAllowed ? (
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="space-y-1">
+                    <Label htmlFor="white-label" className="text-sm font-medium">
+                      White-label (hide PulseBoard footer)
+                    </Label>
+                    <p className="text-xs text-muted-foreground">Available on Pro and Agency plans.</p>
+                  </div>
+                  <Switch
+                    id="white-label"
+                    checked={watched.whiteLabel}
+                    onCheckedChange={(c) => setValue('whiteLabel', Boolean(c), { shouldValidate: true })}
+                    aria-label="White-label branding"
+                  />
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Upgrade to Pro or Agency to enable white-label PDFs.</p>
+              )}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -385,18 +557,42 @@ export function ExportSettingsPage() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <ImagePlus className="h-4 w-4" aria-hidden />
-                Logo (optional)
-              </Label>
-              <Input
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                onChange={(e) => void onLogoSelected(e.target.files)}
-                aria-label="Upload company logo"
-              />
-              <p className="text-xs text-muted-foreground">PNG, JPG, WebP, or SVG. Stored privately per company.</p>
+            <ExportBrandingUploader
+              onFileChange={(files) => void onLogoSelected(files)}
+              disabled={!companyId || upsertBranding.isPending}
+            />
+
+            <div className="space-y-4 rounded-lg border border-border/80 p-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-1">
+                  <Label htmlFor="notify-email" className="text-sm font-medium">
+                    Email me when export completes
+                  </Label>
+                  <p className="text-xs text-muted-foreground">Sends the export-ready template with a download link.</p>
+                </div>
+                <Switch
+                  id="notify-email"
+                  checked={watched.notifyByEmail}
+                  onCheckedChange={(c) => setValue('notifyByEmail', Boolean(c), { shouldValidate: true })}
+                  aria-label="Email when export completes"
+                />
+              </div>
+              {watched.notifyByEmail ? (
+                <div className="space-y-2">
+                  <Label htmlFor="deliveryEmail">Delivery email</Label>
+                  <Input
+                    id="deliveryEmail"
+                    type="email"
+                    value={watched.deliveryEmail}
+                    onChange={(e) => setValue('deliveryEmail', e.target.value, { shouldValidate: true })}
+                    placeholder="you@company.com"
+                    aria-label="Email address for export delivery"
+                  />
+                  {formState.errors.deliveryEmail ? (
+                    <p className="text-xs text-destructive">{formState.errors.deliveryEmail.message}</p>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -411,7 +607,7 @@ export function ExportSettingsPage() {
               <Button
                 type="submit"
                 variant="primary"
-                className="gap-2 transition-transform duration-200 hover:scale-[1.02]"
+                className="gap-2 transition-transform duration-200 hover:scale-[1.02] motion-reduce:transform-none"
                 disabled={startExport.isPending}
               >
                 {startExport.isPending ? (
@@ -429,33 +625,32 @@ export function ExportSettingsPage() {
             </div>
           </form>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Export progress</span>
-              <span>{startExport.isPending ? 'Processing…' : signedDownloadUrl ? 'Complete' : 'Idle'}</span>
-            </div>
-            <Progress
-              value={startExport.isPending ? 45 : signedDownloadUrl ? 100 : 0}
-              className="h-2 motion-reduce:transition-none"
-            />
-          </div>
+          <ExportProgressIndicator
+            phase={progressPhase}
+            progressPercent={progressPercent}
+            statusLabel={statusLabel}
+            errorMessage={polledJob?.status === 'failed' ? polledJob.error_message : null}
+          />
 
           {signedDownloadUrl ? (
-            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 p-4 animate-fade-in motion-reduce:animate-none">
-              <Button asChild variant="primary" className="gap-2">
-                <a href={signedDownloadUrl} target="_blank" rel="noreferrer">
-                  <Download className="h-4 w-4" aria-hidden />
-                  Download {watched.format === 'html' ? 'HTML' : 'PDF'}
-                </a>
-              </Button>
-              <Button type="button" variant="secondary" onClick={() => void onRefreshDownload()} disabled={refreshUrl.isPending}>
-                Refresh link
-              </Button>
-            </div>
+            <ExportDownloadPanel
+              signedUrl={signedDownloadUrl}
+              formatLabel={watched.format === 'html' ? 'HTML' : 'PDF'}
+              fileNameHint={`Report export · ${watched.format === 'html' ? 'HTML document' : 'PDF document'}`}
+              fileSizeBytes={completedFileSize ?? (typeof polledJob?.file_size_bytes === 'number' ? polledJob.file_size_bytes : null)}
+              onRefreshLink={() => void onRefreshDownload()}
+              isRefreshing={refreshUrl.isPending}
+            />
+          ) : null}
+
+          {lastExportId && signedDownloadUrl ? (
+            <ExportEmailPanel reportId={reportId} exportId={lastExportId} disabled={startExport.isPending} />
           ) : null}
         </Card>
 
         <div className="space-y-6">
+          <ExportSummaryPanel values={watched} />
+
           <Card className="overflow-hidden p-0 transition-shadow duration-200 hover:shadow-md">
             <div
               className="border-b px-6 py-4"
@@ -465,13 +660,13 @@ export function ExportSettingsPage() {
             >
               <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <Palette className="h-4 w-4" style={{ color: watched.primaryColor }} aria-hidden />
-                Live preview
+                Brand preview
               </div>
               <p className="text-xs text-muted-foreground">Approximates cover styling for the exported document.</p>
             </div>
             <div className="space-y-4 p-6">
               <div className="flex flex-wrap items-center gap-4">
-                {logoPreviewUrl ? (
+                {watched.includeLogo && logoPreviewUrl ? (
                   <img
                     src={logoPreviewUrl}
                     alt="Company logo preview"
@@ -479,7 +674,7 @@ export function ExportSettingsPage() {
                   />
                 ) : (
                   <div className="flex h-14 w-28 items-center justify-center rounded-lg border border-dashed text-xs text-muted-foreground">
-                    No logo
+                    {watched.includeLogo ? 'Upload logo' : 'Logo off'}
                   </div>
                 )}
                 <div>
@@ -487,9 +682,14 @@ export function ExportSettingsPage() {
                     {company?.name ?? 'Your company'}
                   </p>
                   <p className="text-sm text-muted-foreground">Company health report</p>
+                  {!watched.whiteLabel ? (
+                    <p className="mt-1 text-[11px] text-muted-foreground">PulseBoard attribution in footer</p>
+                  ) : (
+                    <p className="mt-1 text-[11px] text-muted-foreground">White-label footer</p>
+                  )}
                 </div>
               </div>
-              <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground prose prose-sm max-w-none dark:prose-invert">
+              <div className="prose prose-sm max-w-none rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground dark:prose-invert">
                 <p className="whitespace-pre-wrap text-foreground">
                   {(report.executive_summary ?? '').slice(0, 280)}
                   {(report.executive_summary ?? '').length > 280 ? '…' : ''}
@@ -507,15 +707,19 @@ export function ExportSettingsPage() {
                 {(safeJobs ?? []).map((job) => {
                   const params = job.export_params && typeof job.export_params === 'object' ? job.export_params : {}
                   const fmt = typeof (params as { format?: string }).format === 'string' ? (params as { format: string }).format : 'pdf'
+                  const fsize =
+                    typeof job.file_size_bytes === 'number' && Number.isFinite(job.file_size_bytes)
+                      ? ` · ${(job.file_size_bytes / 1024).toFixed(0)} KB`
+                      : ''
                   return (
                     <li
                       key={job.id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-3 transition-colors hover:bg-muted/30"
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-3 transition-colors duration-200 hover:bg-muted/30"
                     >
                       <div>
                         <p className="font-medium">{new Date(job.created_at).toLocaleString()}</p>
                         <p className="text-xs text-muted-foreground">
-                          {fmt.toUpperCase()} · {job.progress}%
+                          {fmt.toUpperCase()} · {job.progress}%{fsize}
                         </p>
                       </div>
                       <Badge variant={statusBadgeVariant(job.status)}>{job.status}</Badge>
