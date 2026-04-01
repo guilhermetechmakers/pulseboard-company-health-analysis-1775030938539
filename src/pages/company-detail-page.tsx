@@ -8,13 +8,14 @@ import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SyncHistoryPanel } from '@/components/integrations/sync-history-panel'
 import { ProfileSummaryCard } from '@/components/company/profile-summary-card'
-import { HealthBreakdownPanel } from '@/components/company/health-breakdown-panel'
+import { HealthScoreCard } from '@/components/company/health-score-card'
+import { AnalysisHistoryPanel } from '@/components/analysis/analysis-history-panel'
+import { CacheStatusBadge } from '@/components/cache/cache-status-badge'
 import { AnalysisHistoryTimeline } from '@/components/company/analysis-history-timeline'
 import { SaveInputSnapshotPanel } from '@/components/company/save-input-snapshot-panel'
 import { CompanyWorkspaceForms } from '@/components/company/company-workspace-forms'
 import { useMyCompany } from '@/hooks/use-my-company'
 import { useCompanyReports } from '@/hooks/use-analysis'
-import { AnalysisHistoryList } from '@/components/analysis/analysis-history-list'
 import { useIntegrations } from '@/hooks/use-integrations'
 import { useSyncJobs } from '@/hooks/use-sync-jobs'
 import {
@@ -42,9 +43,25 @@ export function CompanyDetailPage() {
   const companyId = company?.id
   const { data: integrations = [] } = useIntegrations(companyId)
   const { data: jobs, isLoading: jobsLoading } = useSyncJobs(companyId)
-  const { data: agg, isLoading: aggLoading } = useCompanyAggregates(companyId)
-  const { data: companyReports = [] } = useCompanyReports(companyId ?? null)
-  const { data: healthHistory = [], isLoading: healthLoading } = useCompanyHealthScores(companyId ?? null, 48)
+  const {
+    data: agg,
+    isLoading: aggLoading,
+    isFetching: aggFetching,
+    isStale: aggStale,
+  } = useCompanyAggregates(companyId)
+  const {
+    data: companyReports = [],
+    pulseCache: reportsPulse,
+    isFetching: reportsFetching,
+    isStale: reportsStale,
+  } = useCompanyReports(companyId ?? null)
+  const {
+    data: healthHistory = [],
+    isLoading: healthLoading,
+    isFetching: healthFetching,
+    isStale: healthStale,
+    pulseCache: healthPulse,
+  } = useCompanyHealthScores(companyId ?? null, 48)
   const computeHealth = useComputeHealthScore()
   const [selectedHealthId, setSelectedHealthId] = useState<string | null>(null)
 
@@ -143,17 +160,25 @@ export function CompanyDetailPage() {
         {healthLoading ? (
           <Skeleton className="h-80 w-full lg:col-span-2" />
         ) : (
-          <HealthBreakdownPanel
-            className="lg:col-span-2"
-            overall={overallVal}
-            financial={financialVal}
-            market={marketVal}
-            brandSocial={brandVal}
-            history={safeHistory}
-          />
+          <div className="lg:col-span-2">
+            <HealthScoreCard
+              className="lg:col-span-2"
+              pulseCache={healthPulse}
+              isFetching={healthFetching}
+              isStale={healthStale}
+              overall={overallVal}
+              financial={financialVal}
+              market={marketVal}
+              brandSocial={brandVal}
+              history={safeHistory}
+            />
+          </div>
         )}
         <Card className="border-border/80 p-6 shadow-card">
-          <h2 className="text-lg font-semibold tracking-tight">Data completeness</h2>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <h2 className="text-lg font-semibold tracking-tight">Data completeness</h2>
+            <CacheStatusBadge meta={agg?.pulseCache} isFetching={aggFetching} isStale={aggStale} />
+          </div>
           <Progress value={pct} className="mt-4" />
           <p className="mt-2 text-sm text-muted-foreground">{pct}% complete</p>
           <p className="mt-4 text-xs text-muted-foreground">
@@ -272,7 +297,13 @@ export function CompanyDetailPage() {
                 </Button>
               </Card>
             ) : null}
-            <AnalysisHistoryList reports={Array.isArray(companyReports) ? companyReports : []} />
+            <AnalysisHistoryPanel
+              companyId={companyId}
+              reports={Array.isArray(companyReports) ? companyReports : []}
+              pulseCache={reportsPulse}
+              isFetching={reportsFetching}
+              isStale={reportsStale}
+            />
           </div>
         </TabsContent>
         <TabsContent value="activity">

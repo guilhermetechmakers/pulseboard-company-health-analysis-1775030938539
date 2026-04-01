@@ -4,8 +4,19 @@ import { supabase } from '@/lib/supabase'
 import { createInAppNotificationRow } from '@/api/notifications'
 import { invokeAnalyzeCompanyHealth } from '@/lib/supabase-functions'
 import { buildCompletenessFields, completenessPercent } from '@/lib/analysis-completeness'
+import { QUERY_STALE_MS } from '@/constants/cache-policy'
+import {
+  fetchCompanyReportsFromSupabase,
+  fetchReportFromSupabase,
+} from '@/lib/company-data-fetch'
+import {
+  fireAndForgetInvalidateCompanyCache,
+  fireAndForgetInvalidateReportCache,
+  invokePulseCacheApi,
+} from '@/lib/pulse-cache-api'
 import type { AnalysisDepth, AnalyzeCompanyRequest, ReportRow, ReportSnapshotRow } from '@/types/analysis'
 import type { Database } from '@/types/database'
+import type { PulseCacheMeta } from '@/types/pulse-cache'
 
 type Company = Database['public']['Tables']['companies']['Row']
 type Financials = Database['public']['Tables']['company_financials']['Row']
@@ -60,41 +71,91 @@ export function useCompleteness(company: Company | null | undefined, context: Re
   }
 }
 
+export type CompanyReportsQueryData = {
+  reports: ReportRow[]
+  pulseCache?: PulseCacheMeta
+}
+
 export function useCompanyReports(companyId: string | null) {
-  return useQuery({
+  const query = useQuery({
     queryKey: ['company-reports', companyId],
     enabled: Boolean(companyId) && Boolean(supabase),
-    queryFn: async (): Promise<ReportRow[]> => {
-      if (!supabase || !companyId) return []
-      const { data, error } = await supabase
-        .from('reports')
-        .select('*')
-        .eq('company_id', companyId)
-        .order('created_at', { ascending: false })
-      if (error) throw new Error(error.message)
-      const rows = data ?? []
-      return Array.isArray(rows) ? (rows as ReportRow[]) : []
+    staleTime: QUERY_STALE_MS.companyReports,
+    queryFn: async (): Promise<CompanyReportsQueryData> => {
+      if (!supabase || !companyId) {
+        return { reports: [] }
+      }
+      try {
+        const res = await invokePulseCacheApi<unknown[]>({
+          op: 'get_company_analyses',
+          companyId,
+        })
+        if (res.data && !res.error && Array.isArray(res.data)) {
+          return {
+            reports: res.data as ReportRow[],
+            pulseCache: res.meta ?? undefined,
+          }
+        }
+      } catch {
+        /* fallback */
+      }
+      const reports = await fetchCompanyReportsFromSupabase(companyId)
+      return { reports }
     },
   })
+  const raw = query.data
+  const reports = Array.isArray(raw?.reports) ? raw.reports : []
+  return {
+    ...query,
+    data: reports,
+    pulseCache: raw?.pulseCache,
+  }
+}
+
+export type ReportQueryData = {
+  row: ReportRow | null
+  pulseCache?: PulseCacheMeta
 }
 
 export function useReport(reportId: string | undefined) {
-  return useQuery({
+  const query = useQuery({
     queryKey: ['report', reportId],
     enabled: Boolean(reportId) && Boolean(supabase),
-    queryFn: async (): Promise<ReportRow | null> => {
-      if (!supabase || !reportId) return null
-      const { data, error } = await supabase.from('reports').select('*').eq('id', reportId).maybeSingle()
-      if (error) throw new Error(error.message)
-      return data !== null ? (data as ReportRow) : null
+    staleTime: QUERY_STALE_MS.report,
+    queryFn: async (): Promise<ReportQueryData> => {
+      if (!supabase || !reportId) {
+        return { row: null }
+      }
+      try {
+        const res = await invokePulseCacheApi<Record<string, unknown>>({
+          op: 'get_report',
+          reportId,
+        })
+        if (res.data && !res.error && typeof res.data === 'object') {
+          return {
+            row: res.data as ReportRow,
+            pulseCache: res.meta ?? undefined,
+          }
+        }
+      } catch {
+        /* fallback */
+      }
+      const row = await fetchReportFromSupabase(reportId)
+      return { row }
     },
   })
+  return {
+    ...query,
+    data: query.data?.row ?? null,
+    pulseCache: query.data?.pulseCache,
+  }
 }
 
 export function useReportSnapshots(reportId: string | undefined) {
   return useQuery({
     queryKey: ['report-snapshots', reportId],
     enabled: Boolean(reportId) && Boolean(supabase),
+    staleTime: QUERY_STALE_MS.reportSnapshots,
     queryFn: async (): Promise<ReportSnapshotRow[]> => {
       if (!supabase || !reportId) return []
       const { data, error } = await supabase
@@ -123,6 +184,7 @@ export function useRunAnalysis() {
     },
     onSuccess: async (_res, vars) => {
       toast.success('Analysis completed')
+      fireAndForgetInvalidateCompanyCache(vars.companyId)
       await queryClient.invalidateQueries({ queryKey: ['pulse-notifications'] })
       await queryClient.invalidateQueries({ queryKey: ['company-reports', vars.companyId] })
       await queryClient.invalidateQueries({ queryKey: ['company-aggregates', vars.companyId] })
@@ -153,6 +215,9 @@ export function useUpdateReportSections() {
     },
     onSuccess: async (_d, vars) => {
       toast.success('Report saved')
+      const rep = queryClient.getQueryData<ReportQueryData>(['report', vars.reportId])
+      const cid = rep?.row?.company_id
+      fireAndForgetInvalidateReportCache(vars.reportId, typeof cid === 'string' ? cid : undefined)
       await queryClient.invalidateQueries({ queryKey: ['report', vars.reportId] })
     },
     onError: (e: Error) => toast.error(e.message ?? 'Save failed'),
@@ -177,6 +242,9 @@ export function useCreateReportSnapshot() {
     },
     onSuccess: async (_d, vars) => {
       toast.success('Snapshot saved')
+      const rep = queryClient.getQueryData<ReportQueryData>(['report', vars.reportId])
+      const cid = rep?.row?.company_id
+      fireAndForgetInvalidateReportCache(vars.reportId, typeof cid === 'string' ? cid : undefined)
       try {
         await createInAppNotificationRow({
           type: 'snapshot_created',

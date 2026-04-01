@@ -26,6 +26,7 @@ import { buildCompletenessSlices, completenessPercent, healthSubscores } from '@
 import { asRecord, pickNumber } from '@/lib/safe-data'
 import { cn } from '@/lib/utils'
 import { useCompanyHealthScores, useComputeHealthScore } from '@/hooks/use-health-scores'
+import { CacheStatusBadge } from '@/components/cache/cache-status-badge'
 
 export function DashboardPage() {
   const { user, isEmailVerified } = useAuth()
@@ -34,8 +35,18 @@ export function DashboardPage() {
   const companyId = company?.id
   const { data: integrations = [], isLoading: intLoading } = useIntegrations(companyId)
   const { data: jobs, isLoading: jobsLoading } = useSyncJobs(companyId)
-  const { data: agg, isLoading: aggLoading } = useCompanyAggregates(companyId)
-  const { data: healthHistory = [] } = useCompanyHealthScores(companyId ?? null, 16)
+  const {
+    data: agg,
+    isLoading: aggLoading,
+    isFetching: aggFetching,
+    isStale: aggStale,
+  } = useCompanyAggregates(companyId)
+  const {
+    data: healthHistory = [],
+    isFetching: healthFetching,
+    isStale: healthStale,
+    pulseCache: healthPulse,
+  } = useCompanyHealthScores(companyId ?? null, 16)
   const computeHealth = useComputeHealthScore()
 
   const loading = companyLoading || intLoading || aggLoading
@@ -185,9 +196,16 @@ export function DashboardPage() {
       ) : (
         <div className="grid gap-6 lg:grid-cols-2">
           <Card className="p-6 transition-shadow duration-200 hover:shadow-lg">
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-xl font-semibold">Overall health</h2>
-              <BarChart3 className="h-5 w-5 text-primary" aria-hidden />
+              <div className="flex flex-wrap items-center gap-2">
+                <CacheStatusBadge
+                  meta={agg?.pulseCache}
+                  isFetching={aggFetching}
+                  isStale={aggStale}
+                />
+                <BarChart3 className="h-5 w-5 text-primary" aria-hidden />
+              </div>
             </div>
             {overall != null ? (
               <p className="text-4xl font-semibold text-primary">{overall}</p>
@@ -206,7 +224,10 @@ export function DashboardPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="p-6 transition-all duration-200 hover:shadow-md lg:col-span-2">
-          <h2 className="mb-2 text-xl font-semibold">Health breakdown</h2>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-xl font-semibold">Health breakdown</h2>
+            <CacheStatusBadge meta={healthPulse} isFetching={healthFetching} isStale={healthStale} />
+          </div>
           <p className="mb-4 text-sm text-muted-foreground">Sub-scores from the latest stored health model.</p>
           <div className="grid gap-3 sm:grid-cols-2">
             {healthSubscores(company?.health_scores ?? {}).map((s) => (
@@ -223,7 +244,10 @@ export function DashboardPage() {
           </div>
         </Card>
         <Card className="p-6">
-          <h2 className="mb-2 text-lg font-semibold">Latest analysis</h2>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold">Latest analysis</h2>
+            <CacheStatusBadge meta={agg?.pulseCache} isFetching={aggFetching} isStale={aggStale} />
+          </div>
           {agg?.latestReport ? (
             <div className="space-y-2 text-sm">
               <p className="text-muted-foreground">Status: {agg.latestReport.status}</p>

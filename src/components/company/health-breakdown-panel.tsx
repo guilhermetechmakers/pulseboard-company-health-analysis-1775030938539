@@ -12,6 +12,8 @@ export interface HealthBreakdownPanelProps {
   brandSocial: number
   history: CompanyHealthScoreRow[]
   className?: string
+  /** When false, hides the panel title row (e.g. when wrapped by HealthScoreCard). */
+  showHeader?: boolean
 }
 
 function sparkPoints(rows: CompanyHealthScoreRow[]): { label: string; score: number }[] {
@@ -50,6 +52,7 @@ export function HealthBreakdownPanel({
   brandSocial,
   history,
   className,
+  showHeader = true,
 }: HealthBreakdownPanelProps) {
   const spark = sparkPoints(history)
 
@@ -60,15 +63,17 @@ export function HealthBreakdownPanel({
         className,
       )}
     >
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">Health breakdown</h2>
-          <p className="text-sm text-muted-foreground">Stacked sub-scores and overall trend from saved analyses.</p>
+      {showHeader ? (
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Health breakdown</h2>
+            <p className="text-sm text-muted-foreground">Stacked sub-scores and overall trend from saved analyses.</p>
+          </div>
+          <Activity className="h-5 w-5 shrink-0 text-primary" aria-hidden />
         </div>
-        <Activity className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-      </div>
+      ) : null}
 
-      <div className="mb-6 flex flex-wrap items-end gap-4 border-b border-border/60 pb-6">
+      <div className={cn('flex flex-wrap items-end gap-4 border-b border-border/60 pb-6', showHeader ? 'mb-6' : 'mb-4')}>
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Overall</p>
           <p className="text-4xl font-semibold text-primary tabular-nums" aria-live="polite">

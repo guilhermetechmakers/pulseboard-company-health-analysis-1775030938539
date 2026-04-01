@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { supabase } from '@/lib/supabase'
+import { fireAndForgetInvalidateCompanyCache } from '@/lib/pulse-cache-api'
 import type { CompanyRow } from '@/types/integrations'
 import type { Database } from '@/types/database'
 import { cn } from '@/lib/utils'
@@ -206,8 +207,10 @@ export function CompanyWorkspaceForms({
     },
     onSuccess: async () => {
       toast.success('Profile saved')
+      fireAndForgetInvalidateCompanyCache(companyId)
       await queryClient.invalidateQueries({ queryKey: ['company', 'mine'] })
       await queryClient.invalidateQueries({ queryKey: ['company-aggregates', companyId] })
+      await queryClient.invalidateQueries({ queryKey: ['company-health-scores', companyId] })
     },
     onError: (e: Error) => toast.error(e.message ?? 'Save failed'),
   })
@@ -232,8 +235,10 @@ export function CompanyWorkspaceForms({
     },
     onSuccess: async () => {
       toast.success('Financials saved')
+      fireAndForgetInvalidateCompanyCache(companyId)
       await queryClient.invalidateQueries({ queryKey: ['company-aggregates', companyId] })
       await queryClient.invalidateQueries({ queryKey: ['company-analysis-context', companyId] })
+      await queryClient.invalidateQueries({ queryKey: ['company-health-scores', companyId] })
     },
     onError: (e: Error) => toast.error(e.message ?? 'Save failed'),
   })
@@ -259,8 +264,10 @@ export function CompanyWorkspaceForms({
     },
     onSuccess: async () => {
       toast.success('Market data saved')
+      fireAndForgetInvalidateCompanyCache(companyId)
       await queryClient.invalidateQueries({ queryKey: ['company-aggregates', companyId] })
       await queryClient.invalidateQueries({ queryKey: ['company-analysis-context', companyId] })
+      await queryClient.invalidateQueries({ queryKey: ['company-health-scores', companyId] })
     },
     onError: (e: Error) => toast.error(e.message ?? 'Save failed'),
   })
@@ -289,8 +296,10 @@ export function CompanyWorkspaceForms({
     },
     onSuccess: async () => {
       toast.success('Social & brand saved')
+      fireAndForgetInvalidateCompanyCache(companyId)
       await queryClient.invalidateQueries({ queryKey: ['company-aggregates', companyId] })
       await queryClient.invalidateQueries({ queryKey: ['company-analysis-context', companyId] })
+      await queryClient.invalidateQueries({ queryKey: ['company-health-scores', companyId] })
     },
     onError: (e: Error) => toast.error(e.message ?? 'Save failed'),
   })

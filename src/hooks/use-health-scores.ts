@@ -2,31 +2,57 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { invokeComputeHealthScore } from '@/lib/supabase-functions'
+import { QUERY_STALE_MS } from '@/constants/cache-policy'
+import { fetchCompanyHealthScoresFromSupabase } from '@/lib/company-data-fetch'
+import { fireAndForgetInvalidateCompanyCache, invokePulseCacheApi } from '@/lib/pulse-cache-api'
 import type { CompanyHealthScoreRow, CompanyInputSnapshotRow } from '@/types/health-score'
 import type { CompanyRow } from '@/types/integrations'
 import type { Database } from '@/types/database'
+import type { PulseCacheMeta } from '@/types/pulse-cache'
 
 type FinancialsRow = Database['public']['Tables']['company_financials']['Row']
 type MarketRow = Database['public']['Tables']['company_market_data']['Row']
 type SocialRow = Database['public']['Tables']['company_social']['Row']
 
+export type HealthScoresQueryData = {
+  rows: CompanyHealthScoreRow[]
+  pulseCache?: PulseCacheMeta
+}
+
 export function useCompanyHealthScores(companyId: string | null | undefined, limit = 24) {
-  return useQuery({
+  const q = useQuery({
     queryKey: ['company-health-scores', companyId, limit],
     enabled: Boolean(supabase && companyId),
-    queryFn: async (): Promise<CompanyHealthScoreRow[]> => {
-      if (!supabase || !companyId) return []
-      const { data, error } = await supabase
-        .from('company_health_scores')
-        .select('*')
-        .eq('company_id', companyId)
-        .order('scored_at', { ascending: false })
-        .limit(limit)
-      if (error) throw new Error(error.message)
-      const rows = data ?? []
-      return Array.isArray(rows) ? (rows as CompanyHealthScoreRow[]) : []
+    staleTime: QUERY_STALE_MS.healthScores,
+    queryFn: async (): Promise<HealthScoresQueryData> => {
+      if (!supabase || !companyId) {
+        return { rows: [] }
+      }
+      try {
+        const res = await invokePulseCacheApi<unknown[]>({
+          op: 'get_company_health',
+          companyId,
+          limit,
+        })
+        if (res.data && !res.error && Array.isArray(res.data)) {
+          return {
+            rows: res.data as CompanyHealthScoreRow[],
+            pulseCache: res.meta ?? undefined,
+          }
+        }
+      } catch {
+        /* fallback */
+      }
+      const rows = await fetchCompanyHealthScoresFromSupabase(companyId, limit)
+      return { rows }
     },
   })
+  const rows = Array.isArray(q.data?.rows) ? q.data.rows : []
+  return {
+    ...q,
+    data: rows,
+    pulseCache: q.data?.pulseCache,
+  }
 }
 
 export function useComputeHealthScore() {
@@ -37,6 +63,7 @@ export function useComputeHealthScore() {
     },
     onSuccess: async (_res, vars) => {
       toast.success('Health score updated')
+      fireAndForgetInvalidateCompanyCache(vars.companyId)
       await queryClient.invalidateQueries({ queryKey: ['company-health-scores', vars.companyId] })
       await queryClient.invalidateQueries({ queryKey: ['company', 'mine'] })
       await queryClient.invalidateQueries({ queryKey: ['company-aggregates', vars.companyId] })
@@ -208,6 +235,7 @@ export function useRestoreCompanyInputSnapshot() {
     },
     onSuccess: async (_d, vars) => {
       toast.success('Restored snapshot')
+      fireAndForgetInvalidateCompanyCache(vars.companyId)
       await queryClient.invalidateQueries({ queryKey: ['company', 'mine'] })
       await queryClient.invalidateQueries({ queryKey: ['company-aggregates', vars.companyId] })
       await queryClient.invalidateQueries({ queryKey: ['company-analysis-context', vars.companyId] })

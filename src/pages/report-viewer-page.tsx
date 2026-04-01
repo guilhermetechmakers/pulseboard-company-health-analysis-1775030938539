@@ -4,10 +4,12 @@ import { useQuery } from '@tanstack/react-query'
 import { PageTemplate } from '@/components/layout/page-template'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { CacheStatusBadge } from '@/components/cache/cache-status-badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ReportViewerEditorBlock } from '@/components/analysis/report-viewer-editor-block'
 import { SnapshotManager } from '@/components/analysis/snapshot-manager'
+import { CacheStatusBadge } from '@/components/cache/cache-status-badge'
 import { useCreateReportSnapshot, useReport, useReportSnapshots, useUpdateReportSections } from '@/hooks/use-analysis'
 import { supabase } from '@/lib/supabase'
 
@@ -28,7 +30,14 @@ function downloadText(filename: string, content: string, mime: string) {
 export function ReportViewerPage() {
   const { id, reportId: reportIdParam } = useParams()
   const reportId = id ?? reportIdParam
-  const { data: report, isLoading, error } = useReport(reportId)
+  const {
+    data: report,
+    isLoading,
+    error,
+    pulseCache: reportPulse,
+    isFetching: reportFetching,
+    isStale: reportStale,
+  } = useReport(reportId)
   const companyId = report?.company_id
   const { data: companyMeta } = useQuery({
     queryKey: ['company-meta', companyId],
@@ -125,7 +134,8 @@ export function ReportViewerPage() {
               {report.analysis_depth ? ` · Depth: ${report.analysis_depth}` : ''}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <CacheStatusBadge meta={reportPulse} isFetching={reportFetching} isStale={reportStale} />
             <Badge variant="outline" className="capitalize">
               {report.status}
             </Badge>

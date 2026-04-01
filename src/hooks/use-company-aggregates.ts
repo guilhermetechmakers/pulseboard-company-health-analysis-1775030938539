@@ -1,38 +1,71 @@
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { QUERY_STALE_MS } from '@/constants/cache-policy'
+import {
+  fetchCompanyAggregatesFromSupabase,
+  type CompanyAggregatesShape,
+} from '@/lib/company-data-fetch'
+import { invokePulseCacheApi } from '@/lib/pulse-cache-api'
 import { asArray } from '@/lib/safe-data'
+import { supabase } from '@/lib/supabase'
+import type { PulseCacheMeta } from '@/types/pulse-cache'
+import type { ReportRow } from '@/types/analysis'
+
+export type CompanyAggregatesData = CompanyAggregatesShape & {
+  pulseCache?: PulseCacheMeta
+}
+
+const emptyAgg: CompanyAggregatesShape = {
+  financials: null,
+  analytics: null,
+  social: null,
+  billing: null,
+  market: null,
+  latestReport: null,
+}
+
+function normalizeProfileBundle(raw: Record<string, unknown> | null): CompanyAggregatesShape {
+  if (!raw || typeof raw !== 'object') {
+    return { ...emptyAgg }
+  }
+  const latest = raw.latestReport
+  return {
+    financials: (raw.financials ?? null) as CompanyAggregatesShape['financials'],
+    analytics: (raw.analytics ?? null) as CompanyAggregatesShape['analytics'],
+    social: (raw.social ?? null) as CompanyAggregatesShape['social'],
+    billing: (raw.billing ?? null) as CompanyAggregatesShape['billing'],
+    market: (raw.market ?? null) as CompanyAggregatesShape['market'],
+    latestReport: latest !== null && typeof latest === 'object' ? (latest as ReportRow) : null,
+  }
+}
 
 export function useCompanyAggregates(companyId: string | undefined) {
   return useQuery({
     queryKey: ['company-aggregates', companyId],
     enabled: Boolean(supabase && companyId),
-    queryFn: async () => {
+    staleTime: QUERY_STALE_MS.aggregates,
+    queryFn: async (): Promise<CompanyAggregatesData> => {
       if (!supabase || !companyId) {
-        return {
-          financials: null,
-          analytics: null,
-          social: null,
-          billing: null,
-          market: null,
-          latestReport: null,
+        return { ...emptyAgg }
+      }
+
+      try {
+        const res = await invokePulseCacheApi<Record<string, unknown>>({
+          op: 'get_company_profile',
+          companyId,
+        })
+        if (res.data && !res.error) {
+          const bundle = normalizeProfileBundle(res.data)
+          return {
+            ...bundle,
+            pulseCache: res.meta ?? undefined,
+          }
         }
+      } catch {
+        /* fall through */
       }
-      const [fin, ana, soc, bill, mkt, rep] = await Promise.all([
-        supabase.from('company_financials').select('*').eq('company_id', companyId).maybeSingle(),
-        supabase.from('company_analytics').select('*').eq('company_id', companyId).maybeSingle(),
-        supabase.from('company_social').select('*').eq('company_id', companyId).maybeSingle(),
-        supabase.from('company_billing').select('*').eq('company_id', companyId).maybeSingle(),
-        supabase.from('company_market_data').select('*').eq('company_id', companyId).maybeSingle(),
-        supabase.from('reports').select('*').eq('company_id', companyId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
-      ])
-      return {
-        financials: fin.data ?? null,
-        analytics: ana.data ?? null,
-        social: soc.data ?? null,
-        billing: bill.data ?? null,
-        market: mkt.data ?? null,
-        latestReport: rep.data ?? null,
-      }
+
+      const bundle = await fetchCompanyAggregatesFromSupabase(companyId)
+      return { ...bundle }
     },
   })
 }

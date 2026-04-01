@@ -71,3 +71,10 @@ export {
   invokeEmailSend,
   invokeEmailRetry,
 } from '@/lib/supabase-functions'
+
+/** TTL-backed workspace reads (deploy `pulse-cache-api` Edge Function). */
+export {
+  invokePulseCacheApi,
+  fireAndForgetInvalidateCompanyCache,
+  fireAndForgetInvalidateReportCache,
+} from '@/lib/pulse-cache-api'
