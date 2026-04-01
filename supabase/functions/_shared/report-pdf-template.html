@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<!--
+  PulseBoard — reference HTML/CSS shell for branded PDF exports (paired with report-export + report-pdf.ts).
+  Replace tokens: {{COMPANY_NAME}}, {{PRIMARY_COLOR}}, {{SECONDARY_COLOR}}, {{GENERATED_AT}}, {{BODY_HTML}}
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>{{COMPANY_NAME}} — Health report</title>
+    <style>
+      :root {
+        --pb-primary: {{PRIMARY_COLOR}};
+        --pb-secondary: {{SECONDARY_COLOR}};
+        --pb-text: #0f172a;
+        --pb-muted: #374151;
+        --pb-border: #e5e7eb;
+      }
+      body {
+        font-family: Inter, system-ui, sans-serif;
+        color: var(--pb-text);
+        line-height: 1.5;
+        margin: 48px;
+      }
+      header {
+        border-bottom: 2px solid var(--pb-primary);
+        padding-bottom: 16px;
+        margin-bottom: 24px;
+      }
+      h1 {
+        font-size: 22px;
+        margin: 0;
+        color: var(--pb-primary);
+      }
+      .meta {
+        font-size: 12px;
+        color: var(--pb-muted);
+        margin-top: 8px;
+      }
+      section {
+        margin-bottom: 28px;
+      }
+      h2 {
+        font-size: 16px;
+        color: var(--pb-secondary);
+        border-bottom: 1px solid var(--pb-border);
+        padding-bottom: 6px;
+      }
+      .prose {
+        font-size: 13px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>{{COMPANY_NAME}}</h1>
+      <p class="meta">Generated {{GENERATED_AT}}</p>
+    </header>
+    <main class="prose">{{BODY_HTML}}</main>
+  </body>
+</html>

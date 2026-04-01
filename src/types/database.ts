@@ -235,6 +235,7 @@ export interface Database {
           report_id: string
           created_by: string | null
           label: string
+          notes: string | null
           sections: Record<string, unknown>
           created_at: string
         }
@@ -243,10 +244,53 @@ export interface Database {
           report_id: string
           created_by?: string | null
           label?: string
+          notes?: string | null
           sections?: Record<string, unknown>
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['report_snapshots']['Insert']>
+        Relationships: []
+      }
+      report_section_contents: {
+        Row: {
+          id: string
+          report_id: string
+          section_key: string
+          content: string
+          edited_at: string
+          author_id: string | null
+        }
+        Insert: {
+          id?: string
+          report_id: string
+          section_key: string
+          content?: string
+          edited_at?: string
+          author_id?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['report_section_contents']['Insert']>
+        Relationships: []
+      }
+      report_cache_entries: {
+        Row: {
+          id: string
+          report_id: string
+          cache_key: string
+          value: Record<string, unknown>
+          expires_at: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          report_id: string
+          cache_key: string
+          value?: Record<string, unknown>
+          expires_at: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['report_cache_entries']['Insert']>
         Relationships: []
       }
       company_health_scores: {

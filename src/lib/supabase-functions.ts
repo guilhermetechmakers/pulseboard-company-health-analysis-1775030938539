@@ -677,6 +677,72 @@ export type PulseActiveCompanyBody =
   | { action: 'sync_context'; companyId: string }
 
 /** Resolve or sync active company context (`pulse-active-company` Edge Function). */
+export type PulseReportViewerBody =
+  | { op: 'get_report_bundle'; reportId: string }
+  | {
+      op: 'update_section'
+      reportId: string
+      sectionKey: 'executive_summary' | 'financial_analysis' | 'market_analysis' | 'social_analysis'
+      content: string
+    }
+  | {
+      op: 'create_snapshot'
+      reportId: string
+      label: string
+      notes?: string
+      sections: Record<string, unknown>
+    }
+  | { op: 'get_health'; reportId: string }
+  | { op: 'cache_get'; reportId: string; cacheKey: string }
+  | {
+      op: 'cache_set'
+      reportId: string
+      cacheKey: string
+      value: Record<string, unknown>
+      ttlSeconds?: number
+    }
+  | { op: 'cache_delete'; reportId: string; cacheKey: string }
+  | { op: 'restore_snapshot'; reportId: string; snapshotId: string }
+
+/** Report Viewer bundle, validated section writes, snapshots, TTL cache (`pulse-report-viewer-api`). */
+export async function invokePulseReportViewerApi<T = unknown>(body: PulseReportViewerBody): Promise<T> {
+  if (!supabase) {
+    throw new Error('Supabase is not configured')
+  }
+  const url = import.meta.env.VITE_SUPABASE_URL
+  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
+  if (!url || !anon) {
+    throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
+  }
+  const headers = await buildAuthenticatedEdgeHeaders()
+  if (!headers.Authorization?.startsWith('Bearer ')) {
+    throw new Error('Sign in required')
+  }
+  const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/pulse-report-viewer-api`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  })
+  const json = (await res.json()) as { data?: T; error?: unknown }
+  if (!res.ok) {
+    const errMsg =
+      typeof json.error === 'string'
+        ? json.error
+        : json.error !== undefined
+          ? JSON.stringify(json.error)
+          : `pulse-report-viewer-api failed (${res.status})`
+    throw new Error(errMsg)
+  }
+  if (json.error !== null && json.error !== undefined && json.error !== '') {
+    const errMsg = typeof json.error === 'string' ? json.error : JSON.stringify(json.error)
+    throw new Error(errMsg)
+  }
+  if (json.data === undefined) {
+    throw new Error('Invalid response from pulse-report-viewer-api')
+  }
+  return json.data as T
+}
+
 export async function invokePulseActiveCompany(body: PulseActiveCompanyBody): Promise<Record<string, unknown>> {
   if (!supabase) {
     throw new Error('Supabase is not configured')

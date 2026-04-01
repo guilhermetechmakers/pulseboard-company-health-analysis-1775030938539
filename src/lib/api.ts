@@ -88,6 +88,7 @@ export {
   invokePulseCompaniesApi,
   invokePulseDashboardApi,
   invokePulseActiveCompany,
+  invokePulseReportViewerApi,
   pulseDataIoImportCsv,
   pulseDataIoImportStatus,
   pulseDataIoExportCsv,
@@ -101,3 +102,11 @@ export {
   fireAndForgetInvalidateCompanyCache,
   fireAndForgetInvalidateReportCache,
 } from '@/lib/pulse-cache-api'
+
+/** Report Viewer — health, cache rows, snapshot restore (`pulse-report-viewer-api`). */
+export {
+  getReportViewerHealth,
+  setReportViewerCacheEntry,
+  restoreReportSnapshot,
+  invokeReportViewerOp,
+} from '@/api/report-viewer'

@@ -1,17 +1,34 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, Link, Navigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { Link2, Share2 } from 'lucide-react'
 import { PageTemplate } from '@/components/layout/page-template'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ReportViewerEditorBlock } from '@/components/analysis/report-viewer-editor-block'
+import { ReportViewerEditorBlock, type ReportEditorHandle } from '@/components/analysis/report-viewer-editor-block'
 import { SnapshotManager } from '@/components/analysis/snapshot-manager'
 import { CacheStatusBadge } from '@/components/cache/cache-status-badge'
-import { useCreateReportSnapshot, useReport, useReportSnapshots, useUpdateReportSections } from '@/hooks/use-analysis'
+import {
+  useCreateReportSnapshot,
+  useReport,
+  useReportHealthForAnalysis,
+  useReportSnapshots,
+  useRestoreReportSnapshot,
+  useUpdateReportSections,
+  useUpdateReportSwot,
+} from '@/hooks/use-analysis'
 import { useMyCompany } from '@/hooks/use-my-company'
 import { supabase } from '@/lib/supabase'
+import { ReportSectionNav } from '@/components/report-viewer/report-section-nav'
+import { ReportViewerHealthStrip } from '@/components/report-viewer/report-viewer-health-strip'
+import { ReportViewerKpiCharts } from '@/components/report-viewer/report-viewer-kpi-charts'
+import { ReportViewerExportStrip } from '@/components/report-viewer/report-viewer-export-strip'
+import { ReportViewerNotificationsChip } from '@/components/report-viewer/report-viewer-notifications-chip'
+import { SwotQuadrantEditor } from '@/components/report-viewer/swot-quadrant-editor'
+import { REPORT_VIEWER_NAV, parseReportHealthScores } from '@/types/report-viewer'
+import { cn } from '@/lib/utils'
 
 function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((x): x is string => typeof x === 'string') : []
@@ -25,6 +42,12 @@ function downloadText(filename: string, content: string, mime: string) {
   a.download = filename
   a.click()
   URL.revokeObjectURL(url)
+}
+
+function statusLabel(status: string): string {
+  if (status === 'in_progress') return 'generating'
+  if (status === 'completed') return 'completed'
+  return status || 'draft'
 }
 
 export function ReportViewerPage() {
@@ -51,8 +74,52 @@ export function ReportViewerPage() {
     },
   })
   const { data: snapshots } = useReportSnapshots(reportId)
+  const { data: healthBundle, isLoading: healthLoading } = useReportHealthForAnalysis(reportId)
   const updateReport = useUpdateReportSections()
+  const updateSwot = useUpdateReportSwot()
   const createSnapshot = useCreateReportSnapshot()
+  const restoreSnapshot = useRestoreReportSnapshot()
+
+  const execRef = useRef<ReportEditorHandle>(null)
+  const finRef = useRef<ReportEditorHandle>(null)
+  const mktRef = useRef<ReportEditorHandle>(null)
+  const socRef = useRef<ReportEditorHandle>(null)
+
+  const [rawOpen, setRawOpen] = useState(false)
+
+  const healthRow = healthBundle?.row ?? null
+  const embedded = healthBundle?.embedded ?? {}
+  const parsedHealth = useMemo(
+    () =>
+      parseReportHealthScores(
+        healthRow
+          ? {
+              overall: healthRow.overall,
+              financial: healthRow.financial,
+              market: healthRow.market,
+              brand_social: healthRow.brand_social,
+              benchmarks: healthRow.benchmarks,
+            }
+          : null,
+        embedded,
+      ),
+    [healthRow, embedded],
+  )
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key !== 's') return
+      e.preventDefault()
+      const refs = [execRef, finRef, mktRef, socRef]
+      void Promise.all(
+        refs.map(async (r) => {
+          await r.current?.flushSave()
+        }),
+      ).then(() => toast.message('Sections synced'))
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const swot = useMemo(() => {
     const raw = report?.swot
@@ -67,8 +134,6 @@ export function ReportViewerPage() {
       threats: asStringArray(o.threats),
     }
   }, [report?.swot])
-
-  const [rawOpen, setRawOpen] = useState(false)
 
   if (!supabase) {
     return (
@@ -93,7 +158,7 @@ export function ReportViewerPage() {
   if (isLoading) {
     return (
       <PageTemplate title="Loading report" description="Fetching analysis output.">
-        <Card className="h-40 animate-pulse bg-muted motion-reduce:animate-none" />
+        <Card className="h-40 animate-pulse rounded-xl bg-muted motion-reduce:animate-none" />
       </PageTemplate>
     )
   }
@@ -127,192 +192,213 @@ export function ReportViewerPage() {
   return (
     <PageTemplate
       title="Report viewer"
-      description={`${companyName ?? 'Company'}${companyIndustry ? ` · ${companyIndustry}` : ''} · Analysis ${report.status} · ${report.analysis_depth ?? 'standard'} · ${new Date(report.created_at).toLocaleString()}`}
+      description={`${companyName ?? 'Company'}${companyIndustry ? ` · ${companyIndustry}` : ''}`}
     >
-      <Card className="mb-6 border-border/80 p-5 shadow-card no-print">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Report header</p>
-            <h2 className="mt-1 text-xl font-semibold tracking-tight">{companyName ?? 'Company report'}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Generated {new Date(report.created_at).toLocaleString()}
-              {report.analysis_depth ? ` · Depth: ${report.analysis_depth}` : ''}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <CacheStatusBadge meta={reportPulse} isFetching={reportFetching} isStale={reportStale} />
-            <Badge variant="outline" className="capitalize">
-              {report.status}
-            </Badge>
-            {report.benchmarking_enabled ? <Badge variant="warning">Benchmarking</Badge> : null}
-          </div>
-        </div>
-      </Card>
-
-      <div className="mb-6 flex flex-wrap gap-2 no-print">
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => {
-            const md = [
-              `# Executive summary`,
-              exec,
-              `## SWOT`,
-              `### Strengths`,
-              ...(swot.strengths ?? []).map((s) => `- ${s}`),
-              `### Weaknesses`,
-              ...(swot.weaknesses ?? []).map((s) => `- ${s}`),
-              `### Opportunities`,
-              ...(swot.opportunities ?? []).map((s) => `- ${s}`),
-              `### Threats`,
-              ...(swot.threats ?? []).map((s) => `- ${s}`),
-              `## Financial`,
-              fin,
-              `## Market`,
-              market,
-              `## Social`,
-              social,
-            ].join('\n\n')
-            downloadText(`pulseboard-report-${report.id}.md`, md, 'text/markdown')
-          }}
-        >
-          Export Markdown
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => downloadText(`pulseboard-report-${report.id}.json`, payloadJson, 'application/json')}
-        >
-          Export JSON snapshot
-        </Button>
-        <Link to={`/export/${report.id}`} className="inline-flex">
-          <Button type="button" variant="ghost">
-            PDF settings
+      <div className="no-print mb-6 flex gap-2 overflow-x-auto pb-1 lg:hidden">
+        {REPORT_VIEWER_NAV.map((item) => (
+          <Button
+            key={item.id}
+            type="button"
+            variant="secondary"
+            className="h-9 shrink-0 rounded-full px-3 text-sm"
+            onClick={() => document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          >
+            {item.label}
           </Button>
-        </Link>
-        <Button type="button" variant="secondary" onClick={() => window.print()}>
-          Print layout
-        </Button>
+        ))}
       </div>
 
-      <Tabs defaultValue="sections" className="no-print">
-        <TabsList>
-          <TabsTrigger value="sections">Sections</TabsTrigger>
-          <TabsTrigger value="swot">SWOT</TabsTrigger>
-          <TabsTrigger value="risks">Risks & actions</TabsTrigger>
-          <TabsTrigger value="snapshots">Snapshots</TabsTrigger>
-        </TabsList>
+      <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
+        <ReportSectionNav items={REPORT_VIEWER_NAV} />
 
-        <TabsContent value="sections" className="space-y-4">
+        <div className="min-w-0 flex-1 space-y-8 animate-fade-in motion-reduce:animate-none">
+          <Card className="border-border/80 p-5 shadow-card no-print">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Report header</p>
+                <h2 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">{companyName ?? 'Company report'}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Generated {new Date(report.created_at).toLocaleString()}
+                  {report.analysis_depth ? ` · Depth: ${report.analysis_depth}` : ''}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <ReportViewerNotificationsChip />
+                <CacheStatusBadge meta={reportPulse} isFetching={reportFetching} isStale={reportStale} />
+                <Badge variant="outline" className="capitalize">
+                  {statusLabel(report.status)}
+                </Badge>
+                {report.benchmarking_enabled ? <Badge variant="warning">Benchmarking</Badge> : null}
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="h-9 gap-2 px-3 text-sm"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(window.location.href)
+                    toast.success('Shareable link copied')
+                  }}
+                >
+                  <Share2 className="h-4 w-4" />
+                  Copy link
+                </Button>
+              </div>
+            </div>
+          </Card>
+
+          <ReportViewerHealthStrip scores={parsedHealth} isLoading={healthLoading} />
+          <ReportViewerKpiCharts scores={parsedHealth} />
+
+          <div className="no-print flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                const md = [
+                  `# Executive summary`,
+                  exec,
+                  `## SWOT`,
+                  `### Strengths`,
+                  ...(swot.strengths ?? []).map((s) => `- ${s}`),
+                  `### Weaknesses`,
+                  ...(swot.weaknesses ?? []).map((s) => `- ${s}`),
+                  `### Opportunities`,
+                  ...(swot.opportunities ?? []).map((s) => `- ${s}`),
+                  `### Threats`,
+                  ...(swot.threats ?? []).map((s) => `- ${s}`),
+                  `## Financial`,
+                  fin,
+                  `## Market`,
+                  market,
+                  `## Social`,
+                  social,
+                ].join('\n\n')
+                downloadText(`pulseboard-report-${report.id}.md`, md, 'text/markdown')
+              }}
+            >
+              Export Markdown
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => downloadText(`pulseboard-report-${report.id}.json`, payloadJson, 'application/json')}
+            >
+              Export JSON snapshot
+            </Button>
+            <Link to={`/export/${report.id}`} className="inline-flex">
+              <Button type="button" variant="ghost" className="gap-2">
+                <Link2 className="h-4 w-4" />
+                PDF settings
+              </Button>
+            </Link>
+            <Button type="button" variant="secondary" onClick={() => window.print()}>
+              Print layout
+            </Button>
+          </div>
+
           <ReportViewerEditorBlock
+            ref={execRef}
+            sectionId="section-exec"
             title="Executive summary"
             value={exec}
-            isSaving={updateReport.isPending}
+            isSaving={updateReport.isPending || updateSwot.isPending}
             autoSaveDebounceMs={1600}
             onSave={async (next) => {
-              await updateReport.mutateAsync({ reportId: report.id, patch: { executive_summary: next } })
+              await updateReport.mutateAsync({ reportId: report.id, sectionKey: 'executive_summary', content: next })
             }}
           />
+
+          <SwotQuadrantEditor
+            swot={report.swot ?? {}}
+            isSaving={updateSwot.isPending}
+            onSave={async (next) => {
+              await updateSwot.mutateAsync({ reportId: report.id, swot: next })
+            }}
+          />
+
           <ReportViewerEditorBlock
+            ref={finRef}
+            sectionId="section-fin"
             title="Financial analysis"
             value={fin}
-            isSaving={updateReport.isPending}
+            isSaving={updateReport.isPending || updateSwot.isPending}
             autoSaveDebounceMs={1600}
             onSave={async (next) => {
-              await updateReport.mutateAsync({ reportId: report.id, patch: { financial_analysis: next } })
+              await updateReport.mutateAsync({ reportId: report.id, sectionKey: 'financial_analysis', content: next })
             }}
           />
           <ReportViewerEditorBlock
+            ref={mktRef}
+            sectionId="section-mkt"
             title="Market analysis"
             value={market}
-            isSaving={updateReport.isPending}
+            isSaving={updateReport.isPending || updateSwot.isPending}
             autoSaveDebounceMs={1600}
             onSave={async (next) => {
-              await updateReport.mutateAsync({ reportId: report.id, patch: { market_analysis: next } })
+              await updateReport.mutateAsync({ reportId: report.id, sectionKey: 'market_analysis', content: next })
             }}
           />
           <ReportViewerEditorBlock
+            ref={socRef}
+            sectionId="section-soc"
             title="Social & brand analysis"
             value={social}
-            isSaving={updateReport.isPending}
+            isSaving={updateReport.isPending || updateSwot.isPending}
             autoSaveDebounceMs={1600}
             onSave={async (next) => {
-              await updateReport.mutateAsync({ reportId: report.id, patch: { social_analysis: next } })
+              await updateReport.mutateAsync({ reportId: report.id, sectionKey: 'social_analysis', content: next })
             }}
           />
-        </TabsContent>
 
-        <TabsContent value="swot">
-          <div className="grid gap-4 md:grid-cols-2">
-            {(['strengths', 'weaknesses', 'opportunities', 'threats'] as const).map((key) => (
-              <Card key={key} className="p-4">
-                <h3 className="mb-2 capitalize text-base font-semibold">{key}</h3>
-                <ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
-                  {(swot[key] ?? []).length === 0 ? <li className="list-none italic">No items</li> : null}
-                  {(swot[key] ?? []).map((line) => (
-                    <li key={line}>{line}</li>
-                  ))}
-                </ul>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="risks" className="space-y-4">
-          <Card className="p-4">
-            <h3 className="mb-2 text-base font-semibold">Top risks</h3>
+          <Card id="section-risks" className={cn('scroll-mt-24 space-y-4 border-border/80 p-4 shadow-card')}>
+            <h3 className="text-base font-semibold text-foreground">Top risks</h3>
             <ul className="space-y-2 text-sm">
               {(Array.isArray(report.risks) ? report.risks : []).map((r, i) => {
                 const row = r as { title?: string; severity?: string; detail?: string }
                 return (
-                  <li key={`${row.title ?? 'risk'}-${i}`} className="rounded-lg border border-border p-3">
-                    <p className="font-medium">{row.title ?? 'Risk'}</p>
+                  <li key={`${row.title ?? 'risk'}-${i}`} className="rounded-xl border border-border/80 p-3 transition-shadow hover:shadow-card">
+                    <p className="font-medium text-foreground">{row.title ?? 'Risk'}</p>
                     <p className="text-xs text-warning">{row.severity ?? ''}</p>
                     <p className="text-muted-foreground">{row.detail ?? ''}</p>
                   </li>
                 )
               })}
             </ul>
-          </Card>
-          <Card className="p-4">
-            <h3 className="mb-2 text-base font-semibold">Opportunities</h3>
+            <h3 className="text-base font-semibold text-foreground">Opportunities</h3>
             <ul className="space-y-2 text-sm">
               {(Array.isArray(report.opportunities) ? report.opportunities : []).map((r, i) => {
                 const row = r as { title?: string; impact?: string; detail?: string }
                 return (
-                  <li key={`${row.title ?? 'opp'}-${i}`} className="rounded-lg border border-border p-3">
-                    <p className="font-medium">{row.title ?? 'Opportunity'}</p>
+                  <li key={`${row.title ?? 'opp'}-${i}`} className="rounded-xl border border-border/80 p-3 transition-shadow hover:shadow-card">
+                    <p className="font-medium text-foreground">{row.title ?? 'Opportunity'}</p>
                     <p className="text-xs text-accent">{row.impact ?? ''}</p>
                     <p className="text-muted-foreground">{row.detail ?? ''}</p>
                   </li>
                 )
               })}
             </ul>
-          </Card>
-          <Card className="p-4">
-            <h3 className="mb-2 text-base font-semibold">Action plan</h3>
+            <h3 className="text-base font-semibold text-foreground">Action plan</h3>
             <ol className="list-decimal space-y-2 pl-5 text-sm">
               {(Array.isArray(report.action_plan) ? report.action_plan : []).map((r, i) => {
                 const row = r as { priority?: number; action?: string; rationale?: string }
                 return (
                   <li key={`${row.action ?? 'act'}-${i}`}>
-                    <p className="font-medium">{row.action ?? 'Action'}</p>
+                    <p className="font-medium text-foreground">{row.action ?? 'Action'}</p>
                     <p className="text-muted-foreground">{row.rationale ?? ''}</p>
                   </li>
                 )
               })}
             </ol>
           </Card>
-        </TabsContent>
 
-        <TabsContent value="snapshots">
           <SnapshotManager
             snapshots={safeSnapshots}
             isCreating={createSnapshot.isPending}
-            onCreate={async (label) => {
+            isRestoring={restoreSnapshot.isPending}
+            onCreate={async (snapLabel, snapNotes) => {
               await createSnapshot.mutateAsync({
                 reportId: report.id,
-                label,
+                label: snapLabel,
+                notes: snapNotes || undefined,
                 sections: {
                   executive_summary: report.executive_summary ?? '',
                   financial_analysis: report.financial_analysis ?? '',
@@ -322,40 +408,45 @@ export function ReportViewerPage() {
                 },
               })
             }}
+            onRestore={async (snap) => {
+              await restoreSnapshot.mutateAsync({ reportId: report.id, snapshot: snap })
+            }}
           />
-        </TabsContent>
-      </Tabs>
 
-      <Card className="print-report-root mt-8 hidden p-4 print:block">
-        <div className="prose prose-sm max-w-none dark:prose-invert">
-          <h2 className="text-foreground">Print-ready summary</h2>
-          <h3>Executive summary</h3>
-          <p className="whitespace-pre-wrap text-muted-foreground">{exec || '—'}</p>
-          <h3>Financial</h3>
-          <p className="whitespace-pre-wrap text-muted-foreground">{fin || '—'}</p>
-          <h3>Market</h3>
-          <p className="whitespace-pre-wrap text-muted-foreground">{market || '—'}</p>
-          <h3>Social &amp; brand</h3>
-          <p className="whitespace-pre-wrap text-muted-foreground">{social || '—'}</p>
+          <ReportViewerExportStrip reportId={report.id} />
+
+          <Card className="print-report-root mt-8 hidden p-4 print:block">
+            <div className="prose prose-sm max-w-none dark:prose-invert">
+              <h2 className="text-foreground">Print-ready summary</h2>
+              <h3>Executive summary</h3>
+              <p className="whitespace-pre-wrap text-muted-foreground">{exec || '—'}</p>
+              <h3>Financial</h3>
+              <p className="whitespace-pre-wrap text-muted-foreground">{fin || '—'}</p>
+              <h3>Market</h3>
+              <p className="whitespace-pre-wrap text-muted-foreground">{market || '—'}</p>
+              <h3>Social &amp; brand</h3>
+              <p className="whitespace-pre-wrap text-muted-foreground">{social || '—'}</p>
+            </div>
+          </Card>
+
+          <Card className="mt-8 border-border/80 p-4 no-print">
+            <button
+              type="button"
+              className="flex w-full items-center justify-between text-left text-sm font-semibold text-foreground"
+              onClick={() => setRawOpen((o) => !o)}
+              aria-expanded={rawOpen}
+            >
+              Raw AI payload & metadata
+              <span className="text-muted-foreground">{rawOpen ? 'Hide' : 'Show'}</span>
+            </button>
+            {rawOpen ? (
+              <pre className="mt-3 max-h-[420px] overflow-auto rounded-lg bg-muted p-3 text-xs motion-reduce:scroll-auto">
+                {payloadJson}
+              </pre>
+            ) : null}
+          </Card>
         </div>
-      </Card>
-
-      <Card className="mt-8 p-4 no-print">
-        <button
-          type="button"
-          className="flex w-full items-center justify-between text-left text-sm font-semibold"
-          onClick={() => setRawOpen((o) => !o)}
-          aria-expanded={rawOpen}
-        >
-          Raw AI payload & metadata
-          <span className="text-muted-foreground">{rawOpen ? 'Hide' : 'Show'}</span>
-        </button>
-        {rawOpen ? (
-          <pre className="mt-3 max-h-[420px] overflow-auto rounded-lg bg-muted p-3 text-xs motion-reduce:scroll-auto">
-            {payloadJson}
-          </pre>
-        ) : null}
-      </Card>
+      </div>
     </PageTemplate>
   )
 }

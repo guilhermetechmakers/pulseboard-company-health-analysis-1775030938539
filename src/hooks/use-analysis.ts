@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { createInAppNotificationRow } from '@/api/notifications'
-import { invokeAnalyzeCompanyHealth } from '@/lib/supabase-functions'
+import { invokeAnalyzeCompanyHealth, invokePulseReportViewerApi } from '@/lib/supabase-functions'
 import { buildCompletenessFields, completenessPercent } from '@/lib/analysis-completeness'
 import { QUERY_STALE_MS } from '@/constants/cache-policy'
 import { dashboardOverviewQueryKey } from '@/hooks/use-dashboard-overview'
@@ -16,6 +16,8 @@ import {
   invokePulseCacheApi,
 } from '@/lib/pulse-cache-api'
 import type { AnalysisDepth, AnalyzeCompanyRequest, ReportRow, ReportSnapshotRow } from '@/types/analysis'
+import type { CompanyHealthScoreRow } from '@/types/health-score'
+import type { ReportTextSectionKey } from '@/types/report-viewer'
 import type { Database } from '@/types/database'
 import type { PulseCacheMeta } from '@/types/pulse-cache'
 
@@ -200,24 +202,47 @@ export function useRunAnalysis() {
   })
 }
 
+export type { ReportTextSectionKey } from '@/types/report-viewer'
+
 export function useUpdateReportSections() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (input: {
-      reportId: string
-      patch: Partial<{
-        executive_summary: string | null
-        financial_analysis: string | null
-        market_analysis: string | null
-        social_analysis: string | null
-      }>
-    }) => {
+    mutationFn: async (input: { reportId: string; sectionKey: ReportTextSectionKey; content: string }) => {
+      try {
+        await invokePulseReportViewerApi({ op: 'update_section', ...input })
+        return
+      } catch {
+        if (!supabase) throw new Error('Supabase is not configured')
+        const { error } = await supabase
+          .from('reports')
+          .update({ [input.sectionKey]: input.content, updated_at: new Date().toISOString() })
+          .eq('id', input.reportId)
+        if (error) throw new Error(error.message)
+      }
+    },
+    onSuccess: async (_d, vars) => {
+      const rep = queryClient.getQueryData<ReportQueryData>(['report', vars.reportId])
+      const cid = rep?.row?.company_id
+      fireAndForgetInvalidateReportCache(vars.reportId, typeof cid === 'string' ? cid : undefined)
+      await queryClient.invalidateQueries({ queryKey: ['report', vars.reportId] })
+    },
+    onError: (e: Error) => toast.error(e.message ?? 'Save failed'),
+  })
+}
+
+export function useUpdateReportSwot() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { reportId: string; swot: Record<string, unknown> }) => {
       if (!supabase) throw new Error('Supabase is not configured')
-      const { error } = await supabase.from('reports').update({ ...input.patch, updated_at: new Date().toISOString() }).eq('id', input.reportId)
+      const { error } = await supabase
+        .from('reports')
+        .update({ swot: input.swot, updated_at: new Date().toISOString() })
+        .eq('id', input.reportId)
       if (error) throw new Error(error.message)
     },
     onSuccess: async (_d, vars) => {
-      toast.success('Report saved')
+      toast.success('SWOT updated')
       const rep = queryClient.getQueryData<ReportQueryData>(['report', vars.reportId])
       const cid = rep?.row?.company_id
       fireAndForgetInvalidateReportCache(vars.reportId, typeof cid === 'string' ? cid : undefined)
@@ -230,18 +255,31 @@ export function useUpdateReportSections() {
 export function useCreateReportSnapshot() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (input: { reportId: string; label: string; sections: Record<string, string> }) => {
-      if (!supabase) throw new Error('Supabase is not configured')
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      const { error } = await supabase.from('report_snapshots').insert({
-        report_id: input.reportId,
-        label: input.label,
-        sections: input.sections as Record<string, unknown>,
-        created_by: user?.id ?? null,
-      })
-      if (error) throw new Error(error.message)
+    mutationFn: async (input: { reportId: string; label: string; notes?: string; sections: Record<string, string> }) => {
+      const sectionsPayload = input.sections as Record<string, unknown>
+      try {
+        await invokePulseReportViewerApi({
+          op: 'create_snapshot',
+          reportId: input.reportId,
+          label: input.label,
+          notes: input.notes,
+          sections: sectionsPayload,
+        })
+        return
+      } catch {
+        if (!supabase) throw new Error('Supabase is not configured')
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        const { error } = await supabase.from('report_snapshots').insert({
+          report_id: input.reportId,
+          label: input.label,
+          notes: input.notes ?? null,
+          sections: sectionsPayload,
+          created_by: user?.id ?? null,
+        })
+        if (error) throw new Error(error.message)
+      }
     },
     onSuccess: async (_d, vars) => {
       toast.success('Snapshot saved')
@@ -261,5 +299,97 @@ export function useCreateReportSnapshot() {
       await queryClient.invalidateQueries({ queryKey: ['report-snapshots', vars.reportId] })
     },
     onError: (e: Error) => toast.error(e.message ?? 'Snapshot failed'),
+  })
+}
+
+export function useRestoreReportSnapshot() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { reportId: string; snapshot: ReportSnapshotRow }) => {
+      try {
+        await invokePulseReportViewerApi({
+          op: 'restore_snapshot',
+          reportId: input.reportId,
+          snapshotId: input.snapshot.id,
+        })
+        return
+      } catch {
+        /* fallback when Edge Function unavailable */
+      }
+      if (!supabase) throw new Error('Supabase is not configured')
+      const raw = input.snapshot.sections
+      if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+        throw new Error('Invalid snapshot data')
+      }
+      const s = raw as Record<string, unknown>
+      const getStr = (k: string): string => (typeof s[k] === 'string' ? (s[k] as string) : '')
+
+      let swotPatch: Record<string, unknown> | undefined
+      if (typeof s.swot_json === 'string' && s.swot_json.trim().length > 0) {
+        try {
+          const p = JSON.parse(s.swot_json) as unknown
+          if (p !== null && typeof p === 'object' && !Array.isArray(p)) {
+            swotPatch = p as Record<string, unknown>
+          }
+        } catch {
+          /* keep undefined */
+        }
+      }
+
+      const patch: Record<string, unknown> = {
+        executive_summary: getStr('executive_summary') || null,
+        financial_analysis: getStr('financial_analysis') || null,
+        market_analysis: getStr('market_analysis') || null,
+        social_analysis: getStr('social_analysis') || null,
+        updated_at: new Date().toISOString(),
+      }
+      if (swotPatch !== undefined) {
+        patch.swot = swotPatch
+      }
+
+      const { error } = await supabase.from('reports').update(patch).eq('id', input.reportId)
+      if (error) throw new Error(error.message)
+    },
+    onSuccess: async (_d, vars) => {
+      toast.success('Snapshot restored')
+      const rep = queryClient.getQueryData<ReportQueryData>(['report', vars.reportId])
+      const cid = rep?.row?.company_id
+      fireAndForgetInvalidateReportCache(vars.reportId, typeof cid === 'string' ? cid : undefined)
+      await queryClient.invalidateQueries({ queryKey: ['report', vars.reportId] })
+      await queryClient.invalidateQueries({ queryKey: ['report-health', vars.reportId] })
+    },
+    onError: (e: Error) => toast.error(e.message ?? 'Restore failed'),
+  })
+}
+
+export function useReportHealthForAnalysis(reportId: string | undefined) {
+  return useQuery({
+    queryKey: ['report-health', reportId],
+    enabled: Boolean(supabase && reportId),
+    staleTime: 30_000,
+    queryFn: async () => {
+      if (!supabase || !reportId) {
+        return { row: null as CompanyHealthScoreRow | null, embedded: {} as Record<string, unknown> }
+      }
+      try {
+        return await invokePulseReportViewerApi<{ row: CompanyHealthScoreRow | null; embedded: Record<string, unknown> }>({
+          op: 'get_health',
+          reportId,
+        })
+      } catch {
+        const { data: row } = await supabase
+          .from('company_health_scores')
+          .select('*')
+          .eq('report_id', reportId)
+          .order('scored_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        const { data: rep } = await supabase.from('reports').select('health_scores').eq('id', reportId).maybeSingle()
+        const emb = rep?.health_scores
+        const embedded =
+          emb !== null && typeof emb === 'object' && !Array.isArray(emb) ? (emb as Record<string, unknown>) : {}
+        return { row: row !== null ? (row as CompanyHealthScoreRow) : null, embedded }
+      }
+    },
   })
 }
