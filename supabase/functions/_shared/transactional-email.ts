@@ -36,23 +36,29 @@ export async function sendTemplatedEmailIfEnabled(input: {
   templateType: string
   placeholders: Record<string, string>
   metadata?: Record<string, unknown>
+  /** When set (valid email), send to this address instead of the user's auth email. */
+  toOverride?: string
 }): Promise<{ sent: boolean; skipped?: boolean; reason?: string; dispatchId?: string }> {
-  const { admin, userId, templateType, placeholders, metadata } = input
+  const { admin, userId, templateType, placeholders, metadata, toOverride } = input
 
-  const { data: prefRow } = await admin.from('notification_preferences').select('channels').eq('user_id', userId).maybeSingle()
+  const override =
+    typeof toOverride === 'string' && toOverride.trim().includes('@') ? toOverride.trim() : null
 
-  const channels = asRecord(prefRow?.channels)
-  const ch = channelForEvent(channels, templateType)
-  if (!ch.email) {
-    return { sent: false, skipped: true, reason: 'email_disabled_for_event' }
+  if (!override) {
+    const { data: prefRow } = await admin.from('notification_preferences').select('channels').eq('user_id', userId).maybeSingle()
+    const channels = asRecord(prefRow?.channels)
+    const ch = channelForEvent(channels, templateType)
+    if (!ch.email) {
+      return { sent: false, skipped: true, reason: 'email_disabled_for_event' }
+    }
   }
 
   const { data: userData, error: userErr } = await admin.auth.admin.getUserById(userId)
-  if (userErr || !userData?.user?.email) {
+  if (!override && (userErr || !userData?.user?.email)) {
     return { sent: false, skipped: true, reason: 'user_email_unavailable' }
   }
 
-  const to = userData.user.email
+  const to = override ?? (userData?.user?.email as string)
 
   const { data: tmpl, error: tErr } = await admin.from('email_templates').select('*').eq('type', templateType).maybeSingle()
 
@@ -133,4 +139,30 @@ export async function sendTemplatedEmailIfEnabled(input: {
   })
 
   return { sent: true, dispatchId }
+}
+
+/** One-off Resend delivery (e.g. alternate “send report to” address). Does not write email_dispatches. */
+export async function sendDirectResendEmail(input: {
+  to: string
+  subject: string
+  html: string
+}): Promise<{ sent: boolean; reason?: string }> {
+  const apiKey = Deno.env.get('RESEND_API_KEY')
+  const from = Deno.env.get('RESEND_FROM') ?? 'PulseBoard <onboarding@example.com>'
+  if (!apiKey) {
+    return { sent: false, reason: 'resend_not_configured' }
+  }
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ from, to: [input.to], subject: input.subject, html: input.html }),
+  })
+  if (!res.ok) {
+    const payload: unknown = await res.json().catch(() => ({}))
+    return { sent: false, reason: JSON.stringify(payload) }
+  }
+  return { sent: true }
 }

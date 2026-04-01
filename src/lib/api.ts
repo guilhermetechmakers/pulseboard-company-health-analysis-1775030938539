@@ -89,6 +89,8 @@ export {
   invokePulseDashboardApi,
   invokePulseActiveCompany,
   invokePulseReportViewerApi,
+  invokePulseAnalysesApi,
+  invokePulseNotificationsTrigger,
   pulseDataIoImportCsv,
   pulseDataIoImportStatus,
   pulseDataIoExportCsv,
@@ -110,6 +112,9 @@ export {
   restoreReportSnapshot,
   invokeReportViewerOp,
 } from '@/api/report-viewer'
+
+/** Queued analysis jobs + polling (`pulse-analyses-api`). */
+export { createAnalysisRecord, fetchAnalysisStatus } from '@/api/analyses'
 
 /** Settings — team, CSV preview, billing summary, account deletion (`pulse-settings-api`). */
 export {

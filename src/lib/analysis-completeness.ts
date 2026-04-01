@@ -37,3 +37,44 @@ export function completenessPercent(fields: CompletenessField[]): number {
   const filled = list.filter((f) => f.filled).length
   return Math.round((filled / list.length) * 100)
 }
+
+/** Minimum structured inputs before standard analysis is enabled (profile + at least one domain slice). */
+export function isGenerateAnalysisDataReady(fields: CompletenessField[]): boolean {
+  const list = Array.isArray(fields) ? fields : []
+  const byId = (id: string): boolean => Boolean(list.find((f) => f.id === id)?.filled)
+  const hasProfile = byId('profile_name') && byId('profile_industry')
+  const hasSlice =
+    byId('fin_revenue') || byId('market_competitors') || byId('social_followers')
+  return hasProfile && hasSlice
+}
+
+/** Minimum slices required before Start analysis is enabled (with consent). */
+export function coreAnalysisReadiness(fields: CompletenessField[]): {
+  profileOk: boolean
+  financialOk: boolean
+  marketOk: boolean
+  socialOk: boolean
+  allCoreMet: boolean
+} {
+  const list = Array.isArray(fields) ? fields : []
+  const filled = (id: string) => list.find((f) => f.id === id)?.filled ?? false
+  const profileOk = filled('profile_name') && filled('profile_industry')
+  const financialOk = filled('fin_revenue') || filled('fin_cash')
+  const marketOk = filled('market_competitors')
+  const socialOk = filled('social_followers')
+  return {
+    profileOk,
+    financialOk,
+    marketOk,
+    socialOk,
+    allCoreMet: profileOk && financialOk && marketOk && socialOk,
+  }
+}
+
+/** Minimum data required before enabling Generate Analysis (standard depth). */
+const REQUIRED_FOR_ANALYSIS_IDS = ['profile_name', 'profile_industry', 'fin_revenue', 'market_competitors'] as const
+
+export function isReadyForStandardAnalysis(fields: CompletenessField[]): boolean {
+  const list = Array.isArray(fields) ? fields : []
+  return REQUIRED_FOR_ANALYSIS_IDS.every((id) => Boolean(list.find((f) => f.id === id)?.filled))
+}

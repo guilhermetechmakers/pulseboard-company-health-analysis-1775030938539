@@ -326,287 +326,245 @@ All dashboard pages should be nested inside the dashboard layout, not separate r
 
 ## User Design Requirements
 
-# PulseBoard — Development Blueprint
+typography, spacing, color tokens, and component styling to match PulseBoard
 
-## Project Concept
-PulseBoard is a web application that provides fast, objective company health analyses for founders, small business owners, consultants, agencies, and early-stage investors. It collects structured company data across profile, financials, market, and social/brand channels, augments inputs with optional integrations (QuickBooks, Google Analytics, LinkedIn, Stripe), and uses an AI Analysis Engine (LLM) to produce an executive report containing SWOT, financial/market/social analysis, top risks, opportunities, prioritized action plans, and a multi-dimensional health score. The vision is a lightweight, guided tool that reduces manual, subjective analysis into repeatable, actionable insights, exportable as branded PDFs for client deliverables or internal decision making.
+API integrations:
+- No external APIs beyond internal app endpoints for data, analysis status, and notifications. Local simulation or mock as needed for dev. The page must be able to operate with real-time progress updates when the AI engine runs.
 
-AI app description: an LLM-driven analysis engine that transforms structured user inputs and integrated data into human-readable sections (executive summary, SWOT, risks/opportunities, action plan) and structured JSON outputs for scoring, reporting, and downstream UI rendering.
+PROJECT CONTEXT: Target Page and Connected Features
+- Target Page: Generate Analysis
+- Project: PulseBoard — Company Health Analysis
+- Core components: AI Analysis Engine, Notifications & Emails, Company Detail workspace
+- Data flows: User fills data -> Start Analysis -> AI engine runs -> Progress/logs -> Results -> Notify user -> Option to export/view report
 
-## Problem Statement
-- Core problems:
-  - Company health data is fragmented across spreadsheets, accounting platforms, analytics, and social channels.
-  - Analysis is manual, slow, subjective, and inconsistent.
-  - Non-expert users lack frameworks to prioritize actions and detect risks early.
-- Who experiences these problems:
-  - Founders, small business owners, consultants/agencies, early-stage investors, and SMB finance/strategy managers.
-- Why these problems matter:
-  - Slow or poor analysis leads to missed opportunities, unmanaged risks, inefficient prioritization, and poor investment decisions.
-- Current state / gaps:
-  - No simple tool that aggregates structured inputs + optional integrations and produces an objective, actionable health report optimized for SMB contexts.
-  - Existing BI/consulting workflows are heavy, expensive, or require specialized skills.
+---
 
-## Solution
-PulseBoard solves these problems by:
-- Capturing essential structured inputs via guided forms: company profile, financials, market, and social data.
-- Optionally connecting to integrations (QuickBooks, GA4, LinkedIn, Stripe) or importing CSVs to reduce manual entry.
-- Running an AI Analysis Engine that returns a report (text + structured JSON) with executive summary, SWOT, financial/market/social analyses, risks, opportunities, prioritized actions, and health scores.
-- Presenting results in an editable Report Viewer and enabling PDF export with branding/white-label options for consultants.
-Approach and methodology:
-- Structured inputs to constrain AI prompts and improve signal quality.
-- Tiered analysis depth (brief, standard, deep) with optional benchmarks.
-- Health Scoring Engine combining rule-based weights and optional industry benchmarks.
-Key differentiators:
-- SMB-optimized templates and guidance to reduce friction.
-- Single-company-first UX for quick onboarding and focus.
-- Editable AI outputs so users can refine results and retain final reports.
-Value creation:
-- Faster, repeatable company health evaluations, accessible to non-experts, and exportable for client-facing deliverables.
+## Components to Build
 
-## Requirements
+- GenerateAnalysisPage (UI + logic)
+  - Props/state: user, company, data completeness, depth, benchmarks, consent, sendToEmail, email, isLoading, progress, logs, results
+  - Subcomponents:
+    - DataCompletenessChecklist
+    - AnalysisOptionsPanel (DepthSelector, BenchmarksToggle, SendToEmailToggle, EmailInput)
+    - ConsentSection
+    - StartAnalysisButton (with validation)
+    - ProgressPanel (progress bar, live logs)
+    - ResultsSummaryCard (summary snippet + CTA to Report Viewer)
+    - NotificationsPanel/Toast placeholder (integrates with Notifications)
+- AIAnalysisEngineOrchestrator
+  - Orchestrates steps:
+    - Build prompts based on depth and benchmarks
+    - Execute prompts to generate: Executive Summary, SWOT, Financial/Market/Social analyses, Risks, Opportunities, Action Plan
+  - State machine: Idle -> Validating -> Running -> Completed -> Failed
+  - Emits progress updates and final results payload
+  - Ensures results are stored in a structured format for Report Viewer
+- NotificationsIntegrator
+  - Triggers transactional and in-app notifications for:
+    - Analysis Completed
+    - Export Ready
+    - Analysis Failed
+    - Billing events
+    - Admin alerts
+  - Integrates with email provider for SendToEmail flow
+- ReportViewerLink
+  - Link/button to open the full Report Viewer, passing analysisId
+- DataValidators
+  - Consistent validation utilities for API responses and UI inputs
+- Placeholder/Mock Services (for dev)
+  - If no backend yet, implement mock services with deterministic progress sequences
 
-### 1. Pages (UI Screens)
-- Landing Page
-  - Purpose: Marketing and conversion.
-  - Key sections: Hero, feature cards, how-it-works, pricing teaser, testimonials, CTA.
-  - Contribution: Drives sign-ups and explains value.
+---
 
-- Signup / Create Account
-  - Purpose: Account creation with optional social SSO.
-  - Key sections: Email/password, role, optional company name, plan toggle, consent.
-  - Contribution: Onboard users into product.
+## Implementation Requirements
 
-- Email Verification
-  - Purpose: Verify user email.
-  - Key sections: Status banner, resend, continue CTA.
-  - Contribution: Secure onboarding and compliance.
+### Frontend
+- Components must be built with React (or framework in stack) using TypeScript.
+- Ensure runtime safety:
+  - All arrays use proper defaults: useState<T[]>([]) and guards for null data
+  - Use data ?? [] for any Supabase-like results
+  - Guard every array operation: (items ?? []).map(...) or Array.isArray(items) ? items.map(...) : []
+  - Access nested API responses with optional chaining and default fallbacks
+  - Provide destructuring with defaults: const { items = [], count = 0 } = response ?? {}
+- UI/UX:
+  - All elements styled via the project design system
+  - Accessible controls (labels, ARIA attributes)
+  - Form validations and clear error messages
+- State management:
+  - Local component state for GenerateAnalysisPage
+  - Global state or context (if available) for current user, company, and ongoing analyses
+  - Persist analysis progress in a stable store or backend record (analysisId)
+- Real-time progress:
+  - Implement progress updates via polling or WebSocket-like mechanism (simulate in dev)
+  - Logs should stream progressively with timestamps
+- Data safety:
+  - Ensure consent is required before enabling Start Analysis
+  - Ensure user cannot generate without complete data and consent
+- Accessibility:
+  - Keyboard navigable, screen-reader friendly
 
-- Login / Password Reset
-  - Purpose: Authentication and recovery.
-  - Key sections: Email/password, social login, forgot password flow.
-  - Contribution: Secure access and account recovery.
+### Backend
+- APIs and data models (to be implemented or wired):
+  - Create Analysis Record
+    - POST /api/analyses
+    - Body: { companyId, depth: 'brief'|'standard'|'deep', includeBenchmarks: boolean, sendToEmail: boolean, email?: string, consentGiven: boolean }
+    - Response: { analysisId, status: 'queued'|'running'|'completed'|'failed', startedAt, progress: number }
+  - Get Analysis Status
+    - GET /api/analyses/{analysisId}
+    - Response: { analysisId, status, progress, logs: string[], results?: { executiveSummary, swot, financial, market, social, risks, opportunities, actionPlan } }
+  - Notification trigger endpoints (internal usage)
+    - POST /api/notifications/trigger
+- Data models:
+  - CompanyProfile
+  - AnalysisRecord
+    - id, companyId, userId, depth, includeBenchmarks, consentGiven, sendToEmail, email, status, progress, startedAt, completedAt, resultPayload (structured JSON)
+  - HealthMetrics (for potential Health Score usage)
+- Validation:
+  - Server should validate input shapes and guard against missing fields
+  - Ensure analysis results are stored with non-null shapes
+- Security:
+  - Auth required for creating and fetching analyses
+  - Access control: user is allowed to access analyses for their company
+- Storage:
+  - Persist analysis results to a JSON payload that's consumable by Report Viewer
+  - Maintain history/logs for each analysis
 
-- Dashboard
-  - Purpose: Primary workspace (single-company focus).
-  - Key sections: Company header, overall health score, health breakdown cards, latest analysis, data completeness meter, integrations tile, quick actions.
-  - Contribution: At-a-glance health, prompt to generate analysis.
+### Integration
+- Frontend -> Backend
+  - Start Analysis triggers creation of AnalysisRecord and starts engine
+  - Polling or real-time feed to update progress and logs
+  - On completion, load results into Report Viewer
+  - Trigger NotificationsIntegrator for status changes
+- Data flow safeguards:
+  - All API responses validated; if response shape is unexpected, fallback to safe defaults
+  - Use nullish checks for optional fields
+  - Ensure arrays from API calls are guarded and mapped safely
 
-- Create Company (Wizard)
-  - Purpose: Guided single-company setup.
-  - Key sections: Multi-step Profile → Financials → Market → Social → Review, data completeness, autosave.
-  - Contribution: Capture structured data with minimal friction.
+---
 
-- Company Detail
-  - Purpose: Persistent company workspace.
-  - Key sections: Header with key stats, tabs (Overview, Financials, Market, Social, Reports, Activity), latest analysis card, data completeness and quick edits.
-  - Contribution: Central place to manage data and run analyses.
+## User Experience Flow
 
-- Financials Form
-  - Purpose: Collect financial metrics.
-  - Key sections: Numeric inputs (revenue, expenses, profit margin, cash, debt, CAC/LTV, customer concentration), file upload, calculators, help tips.
-  - Contribution: Feed scoring & AI analysis.
+1. User authenticates and lands on Company Detail workspace (primary, persistent).
+2. User fills or reviews Profile, Financials, Market, and Social data. Data completeness is computed in real-time.
+3. User navigates to Generate Analysis section within the same page or a dedicated sub-view.
+4. User selects analysis depth (brief/standard/deep), toggles benchmarks, optionally enables “send to email” with an email address.
+5. User reviews consent for AI processing; user checks consent box.
+6. Start Analysis button becomes enabled only when required data is complete and consent is given.
+7. User clicks Start Analysis.
+8. UI shows a progress bar, live logs, and status indicators (queued/running).
+9. AI Analysis Engine orchestrates prompts based on chosen depth and benchmarks; progress is updated in real-time.
+10. Upon completion, results payload is stored; UI shows a Results Summary with a CTA to open the full Report Viewer.
+11. Notifications & Inbox receive an entry for analysis completed; if email is configured, a transactional email is sent.
+12. User can export the report or view the full report in Report Viewer; success or failure states are reflected in UI and notifications.
 
-- Market Data Form
-  - Purpose: Capture competitors and market context.
-  - Key sections: Competitor list (structured rows), pricing matrix, trends tags/snippets, opportunities/threats with priorities, autocomplete suggestions.
-  - Contribution: Informs market analysis and SWOT.
+---
 
-- Social & Brand Form
-  - Purpose: Capture social presence & website metrics.
-  - Key sections: Channel rows, followers, engagement, posting frequency, GA integration tile or traffic input, reviews/ratings, CSV import.
-  - Contribution: Inputs for brand/social analysis and scoring.
+## Build Order & Dependencies (Mandatory)
 
-- Generate Analysis
-  - Purpose: Launch and monitor AI analysis job.
-  - Key sections: Data completeness checklist, analysis depth options, benchmarking toggle, consent for AI processing, progress indicator, logs, result card.
-  - Contribution: Run AI Analysis Engine and surface progress/results.
+- Prerequisites:
+  - User authentication system in place
+  - Core Company Detail workspace scaffolding and data models (Profile, Financials, Market, Social)
+  - Notification system (in-app and email) scaffold
+  - Design system and UI components for forms, checklists, and progress indicators
+- Blocks:
+  - Core AI Analysis Engine (orchestrator) with data contracts and prompt templates
+  - Backend APIs for analyses (create, status, results) and notification triggers
+  - Frontend components for Generate Analysis page and integration with Report Viewer
+- Sequencing Rule:
+  - Auth/access control and core data setup must be completed before dashboard/workspace/analytics pages when both exist
 
-- Report Viewer
-  - Purpose: View editable AI-generated report.
-  - Key sections: Header (company, date, share/export), sections (executive summary, SWOT, Financial, Market, Social, Risks, Opportunities, Action Plan), inline edit, feedback widget, download/share.
-  - Contribution: Final report review, edit, and export.
+---
 
-- Export / PDF Settings
-  - Purpose: Configure and generate branded PDF.
-  - Key sections: Section includes/excludes, branding/logo options, orientation, export progress and download link.
-  - Contribution: Produce client-ready deliverables.
+## Technical Specifications
 
-- User Profile
-  - Purpose: Account management and preferences.
-  - Key sections: Profile, security (2FA), subscription summary, recent activity.
-  - Contribution: Security and account configuration.
+- Data Models:
+  - AnalysisRecord
+    - id: string
+    - companyId: string
+    - userId: string
+    - depth: 'brief'|'standard'|'deep'
+    - includeBenchmarks: boolean
+    - consentGiven: boolean
+    - sendToEmail: boolean
+    - email?: string
+    - status: 'queued'|'running'|'completed'|'failed'
+    - progress: number (0-100)
+    - startedAt: string (ISO)
+    - completedAt?: string (ISO)
+    - resultPayload?: {
+        executiveSummary: string
+        swot: any
+        financial: any
+        market: any
+        social: any
+        risks: string[]
+        opportunities: string[]
+        actionPlan: any
+      }
+    - logs?: string[]
+- API Endpoints:
+  - POST /api/analyses
+  - GET /api/analyses/{analysisId}
+  - POST /api/notifications/trigger
+- Security:
+  - JWT-based authentication
+  - Authorization checks to ensure user can access companyId
+  - Input validation on all endpoints
+- Validation:
+  - Use robust type guards and runtime checks
+  - Normalize API responses: const payload = Array.isArray(res?.data) ? res.data : []
+- Optional Data Handling:
+  - All optional fields guarded with nullish coalescing and optional chaining
+  - Default to empty arrays/objects where applicable
 
-- Settings & Preferences
-  - Purpose: Integrations, notifications, team management, data import/export.
-  - Key sections: Integrations center, notification preferences, team invite, danger zone.
-  - Contribution: Manage integrations and account-level settings.
+---
 
-- Admin - User Management
-  - Purpose: Administer users and migrations.
-  - Key sections: User table with filters, user detail modal, suspend/reactivate, impersonate (audit logged), export.
-  - Contribution: Support and admin control.
+## Acceptance Criteria
 
-- Admin Dashboard
-  - Purpose: Monitor product usage and health.
-  - Key sections: Metrics (companies created, reports generated), graphs, system queue, error rates.
-  - Contribution: Operational insights and monitoring.
+- [ ] Generate Analysis page renders with:
+  - Data completeness indicators and consent required
+  - Depth selection, benchmarks toggle, and email option
+  - Start button disabled until required data present and consent given
+  - Real-time progress display with logs
+  - Final Results Summary and link to Report Viewer
+- [ ] AI Analysis Engine:
+  - Creates analyses with correct metadata
+  - Executes prompts based on depth and benchmarks
+  - Produces structured resultPayload consumable by Report Viewer
+  - Emits progress updates and handles errors gracefully
+- [ ] Notifications & Emails integration:
+  - On completion: in-app notification and transactional email if enabled
+  - On failure: in-app notification
+  - Admin/billing alerts triggered appropriately
+- [ ] Company Detail workspace:
+  - Primary, persistent workspace with profile, health score breakdown, and analysis history
+  - Editable forms for profile, financials, market, and social data
+  - Health score recalculation after analysis results
 
-- Password Reset
-  - Purpose: Secure password reset flow.
-  - Key sections: Request, email confirmation, tokenized new password page.
-  - Contribution: Account recovery.
+---
 
-### 2. Features
-- AI Analysis Engine
-  - Technical details: Server-side orchestration of LLM prompts to produce text and structured JSON outputs; depth options (brief/standard/deep); support for benchmarking; store raw LLM payload in Report record.
-  - Implementation notes: Use OpenAI (or chosen provider) with prompt templates; rate-limit and queue jobs; include retry and guardrails; consent capture before processing.
-  - Contribution: Core value — generates the report.
+## UI/UX Guidelines
 
-- Health Scoring Engine
-  - Technical details: Rule-based weighted scoring combining normalized financial, market, and brand metrics; ability to ingest benchmarks for scaling.
-  - Implementation notes: Compute and store HealthScore entries for history; expose breakdown for UI and charts.
-  - Contribution: Quantifies company health.
+- Align with PulseBoard design system: typography, color tokens, spacing, and component styling
+- Clear affordances for actions, states, and success/failure feedback
+- Responsive layout: adapt to desktop and tablet widths
+- Ensure consistent micro-interactions (button hover states, progress updates, toast durations)
 
-- User Authentication
-  - Technical details: Email/password, OAuth (Google, Microsoft, LinkedIn), email verification, password reset, optional 2FA.
-  - Implementation notes: Secure password hashing (bcrypt/argon2), session tokens (JWT or server sessions), Resend for emails via Resend provider.
-  - Contribution: Secure access control.
+---
 
-- Integrations & Connectors
-  - Technical details: OAuth flows for QuickBooks, Google Analytics (GA4), LinkedIn Pages, Stripe; IntegrationCredential storage with encryptedPayload.
-  - Implementation notes: Token refresh, scope management, periodic sync jobs, mapping to single company entity.
-  - Contribution: Reduce manual entry and enrich analysis.
+## Mandatory Coding Standards — Runtime Safety
 
-- CSV Import Utility
-  - Technical details: Server-side parsing of uploaded CSVs (financials, social metrics, competitor lists); validation and mapping UI.
-  - Implementation notes: Use S3 presigned uploads; background parsing jobs; show import preview and mapping rules.
-  - Contribution: Flexible data ingestion path.
+CRITICAL: Follow these rules in ALL generated code to prevent runtime crashes.
 
-- Report Export / PDF Generation
-  - Technical details: HTML/CSS PDF template rendering server-side (headless Chromium or PDF generator) with queued processing and S3 storage of PDFs.
-  - Implementation notes: Support white-label options, include company logo, produce shareable presigned URLs.
-  - Contribution: Deliverable output for users and clients.
+1. Supabase query results: Always use nullish coalescing — const items = data ?? []. Supabase returns null when there are no rows.
+2. Array methods: Never call on a value that could be null/undefined/non-array. Guard with (items ?? []).map(...) or Array.isArray(items) ? items.map(...) : [].
+3. React useState for arrays/objects: Initialize with correct type — useState<Type[]>([]) for arrays; avoid useState() or useState(null).
+4. API response shapes: Validate — const list = Array.isArray(response?.data) ? response.data : [].
+5. Optional chaining: Use obj?.property?.nested when traversing API responses or DB results.
+6. Destructuring with defaults: const { items = [], count = 0 } = response ?? {}.
 
-- Notifications & Emails
-  - Technical details: Transactional emails (verify, reset, analysis complete, export ready) via Resend; in-app notifications for job statuses.
-  - Implementation notes: Templates, retry policies, user notification preferences.
-  - Contribution: Keeps users informed.
+---
 
-- Data Import & Export
-  - Technical details: CSV export/import, integrations export, user data export for compliance.
-  - Implementation notes: Provide audit logs for exports, rate limits.
-  - Contribution: Portability & compliance.
-
-- Audit Logs & Error Monitoring
-  - Technical details: AuditLog entries for critical actions; integrate with Sentry for exceptions/perf.
-  - Implementation notes: Ensure admin access, retention policy.
-  - Contribution: Security, troubleshooting, compliance.
-
-- Caching & Performance
-  - Technical details: Cache health scores, last analysis outputs, integration responses (TTL), and autosave drafts in Redis.
-  - Implementation notes: Invalidate caches on data updates or re-analysis.
-  - Contribution: Reduce latency and costs.
-
-- Search & Filter
-  - Technical details: Full-text search for reports and content; autosuggest for competitors and tags.
-  - Implementation notes: Use Elastic/Algolia for performance.
-  - Contribution: Quick access to content.
-
-- Admin Analytics
-  - Technical details: Metrics collection and dashboards for product decisions.
-  - Implementation notes: Capture key events (company_created, report_generated, analysis_time).
-  - Contribution: Track success metrics.
-
-- Company CRUD & Single-Company Mode Enforcement
-  - Technical details: Database unique constraint for companies per user/account; API middleware to enforce single-company behavior; replace/overwrite flows; migration job to detect users with >1 companies.
-  - Implementation notes: Return 403/409 when create attempted while a company exists; offer admin migration tool for multi-company cases; UI hides multi-company features.
-  - Contribution: Keeps product simple and focused.
-
-### 3. User Journeys
-- New User / Founder (Self-assessment)
-  1. Signup → verify email.
-  2. Redirect to Create Company wizard (Profile → Financials → Market → Social).
-  3. Fill required minimal fields; see data completeness meter.
-  4. Click Generate Analysis (choose depth standard).
-  5. System queues AI Analysis Engine; user sees progress.
-  6. Receive notification/email when ready.
-  7. Open Report Viewer, review, edit text, and download PDF.
-  8. Optionally connect QuickBooks/GA for future auto-syncs.
-
-- Consultant / Agency (Client analysis)
-  1. Signup and select Pro/Agency plan (billing flow).
-  2. Create or replace company (for client) via wizard or CSV import.
-  3. Import financials via QuickBooks/CSV; import web/social via GA/LinkedIn if available.
-  4. Generate deep analysis with benchmarking and white-label enabled.
-  5. Edit and finalize report; export branded PDF and share link with client.
-  6. Schedule recurring analyses (future feature) or run per engagement.
-
-- Investor (Pre-screen)
-  1. Signup → create company or import prospective target’s data via CSV.
-  2. Run brief analysis to get quick health score and risk/opportunity overview.
-  3. Use report to decide whether to proceed to deeper diligence.
-  4. Export or bookmark report for portfolio tracking.
-
-- Admin / Support
-  1. Login to Admin Dashboard.
-  2. Monitor metrics (reports generated, errors).
-  3. Use User Management to inspect accounts, suspend/reactivate, run migrations for users with multiple companies.
-  4. Respond to support requests and impersonate user if required (audit logged).
-
-## UI Guide
-- Color palette (design tokens):
-  - Primary: #0B6AF7 (Blue)
-  - Primary 700 (Dark): #064FD6
-  - Accent / Success: #16A34A (Green)
-  - Warning: #F59E0B (Amber)
-  - Danger: #DC2626 (Red)
-  - Neutral 900: #0F172A (Dark text)
-  - Neutral 700: #374151 (Secondary text)
-  - Neutral 100: #F3F4F6 (Background)
-  - White: #FFFFFF
-- Typography:
-  - UI font: Inter (variable) for headings and body.
-  - Heading scale: H1 28-32px semibold, H2 22-24px semibold, H3 16-18px medium.
-  - Body: 14-16px regular. Line-height 1.4-1.6.
-- Component specs:
-  - Buttons: Primary (filled primary), Secondary (outline neutral), Ghost (text). Corner radius 8px, padding 10–14px.
-  - Inputs: Single-line with 1px neutral border, 8px radius, inline help text, numeric inputs with unit suffixes.
-  - Cards: Elevation level 1, 16px padding, 12px border radius, clear header and body separation.
-  - Tabs: Horizontal, clear active underline, accessible keyboard focus.
-  - Modal: Centered, max-width 720px for wizards, overlay 40% opacity dark.
-  - Forms: Two-column layout for wide screens, single column on mobile; progressive disclosure for advanced fields.
-- Layout principles:
-  - Responsive grid: 12-column system, gutters 16px.
-  - Spacing scale: 4,8,12,16,24,32,40.
-  - Prioritize clarity: concise labels, inline examples, tooltips for complex fields.
-- Visual style & mood:
-  - Professional, optimistic, and actionable. Use data visualizations sparingly and prioritize clear, readable content.
-  - Illustrations: light, flat onboarding illustrations; report visuals should be clean and data-focused.
-- Component patterns:
-  - Data completeness meter: circular or linear with percent and click-to-jump anchors.
-  - Report sections: collapsible panels with edit mode toggles and save snapshot controls.
-  - Analysis progress: stepper + live log + estimated time.
-
-## Instructions to AI Development Tool
-This blueprint provides the complete context needed to build this application. When implementing any part of this project:
-1. Refer back to the Project Concept, Problem Statement, and Solution sections to understand the "why" behind each requirement
-2. Ensure all features and pages align with solving the identified problems
-3. Verify all features and pages are built according to specifications before completing the project
-4. Pay special attention to the UI Guide section and ensure all visual elements follow the design system exactly
-5. Maintain consistency with the overall solution approach throughout implementation
-
-1. Prioritize single-company mode flows: hide multi-company UI, enforce DB unique constraints, and route users to onboarding or company detail as described.
-2. Implement AI Analysis Engine as queued background jobs; capture raw outputs in Report.payload, store status, and surface progress to the user.
-3. Use structured prompts and JSON schema responses from the LLM to populate Report (executiveSummary, swot, financialAnalysis, marketAnalysis, socialAnalysis, risks[], opportunities[], actionPlan[], healthScores).
-4. Integrations must follow OAuth best practices, store encrypted tokens in IntegrationCredential, and map credentials to the active company.
-5. PDF generation must use server-side rendering with a queued worker and store final PDFs in S3 with presigned URLs.
-6. Add robust validation and inline guidance in forms to improve AI output quality; show data completeness and require minimal fields before enabling standard analysis.
-7. Capture telemetry events for all key actions: company_created, analysis_started, analysis_completed, report_exported, integration_connected, user_signup.
-8. Implement audit logging for admin actions and sensitive operations; integrate Sentry for error monitoring and alerting.
-9. Provide admin migration tooling to handle users with >1 companies (dry-run, merge/select primary with audit logs).
-10. Include unit/integration tests for single-company enforcement, AI job retry logic, PDF export pipeline, and integration token refresh flows.
-
-Designers / Developers should rely on the provided data model, assets, and UX flows. Validate AI outputs for safety and relevance, and surface editable text for user refinement to avoid generic or inaccurate recommendations.
+This prompt ensures a cohesive, production-ready implementation plan for the Generate Analysis page, the AI Analysis Engine, the Notifications & Emails subsystem, and the Company Detail workspace, with strict runtime safety, dependency-first sequencing, and a unified acceptance checklist. Use this as a blueprint for the AI development tool to generate concrete code, schemas, APIs, and UI components.
 
 ## Implementation Notes
 

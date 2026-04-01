@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { createInAppNotificationRow } from '@/api/notifications'
+import { createAnalysisRecord, fetchAnalysisStatus } from '@/api/analyses'
 import { invokeAnalyzeCompanyHealth, invokePulseReportViewerApi } from '@/lib/supabase-functions'
 import { buildCompletenessFields, completenessPercent } from '@/lib/analysis-completeness'
 import { QUERY_STALE_MS } from '@/constants/cache-policy'
@@ -16,6 +17,7 @@ import {
   invokePulseCacheApi,
 } from '@/lib/pulse-cache-api'
 import type { AnalysisDepth, AnalyzeCompanyRequest, ReportRow, ReportSnapshotRow } from '@/types/analysis'
+import type { AnalysisStatusResponseData } from '@/types/analysis-job'
 import type { CompanyHealthScoreRow } from '@/types/health-score'
 import type { ReportTextSectionKey } from '@/types/report-viewer'
 import type { Database } from '@/types/database'
@@ -169,6 +171,69 @@ export function useReportSnapshots(reportId: string | undefined) {
       if (error) throw new Error(error.message)
       const rows = data ?? []
       return Array.isArray(rows) ? (rows as ReportSnapshotRow[]) : []
+    },
+  })
+}
+
+const ANALYSIS_POLL_MS = 1600
+const ANALYSIS_MAX_POLLS = 240
+
+export async function waitForAnalysisJobCompletion(
+  analysisId: string,
+  onTick?: (payload: AnalysisStatusResponseData) => void,
+): Promise<AnalysisStatusResponseData> {
+  let polls = 0
+  while (polls < ANALYSIS_MAX_POLLS) {
+    polls += 1
+    const st = await fetchAnalysisStatus(analysisId)
+    onTick?.(st)
+    if (st.status === 'completed') return st
+    if (st.status === 'failed') {
+      const last = (st.logs ?? []).length > 0 ? (st.logs ?? [])[(st.logs ?? []).length - 1] : 'Analysis failed'
+      throw new Error(typeof st.error === 'string' && st.error.trim() ? st.error : last)
+    }
+    await new Promise((r) => setTimeout(r, ANALYSIS_POLL_MS))
+  }
+  throw new Error('Analysis timed out — check Reports or try again.')
+}
+
+/** Queued job + polling (`pulse-analyses-api` / `analysis_jobs`). Preferred for Generate Analysis UI. */
+export function useRunAnalysisJob() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      companyId: string
+      depth: AnalysisDepth
+      includeBenchmarks: boolean
+      sendToEmail: boolean
+      email?: string
+      consentGiven: boolean
+      onProgress?: (s: AnalysisStatusResponseData) => void
+    }) => {
+      const created = await createAnalysisRecord({
+        companyId: input.companyId,
+        depth: input.depth,
+        includeBenchmarks: input.includeBenchmarks,
+        sendToEmail: input.sendToEmail,
+        email: input.email,
+        consentGiven: input.consentGiven,
+      })
+      const final = await waitForAnalysisJobCompletion(created.analysisId, input.onProgress)
+      return { created, final }
+    },
+    onSuccess: async (_res, vars) => {
+      toast.success('Analysis completed')
+      fireAndForgetInvalidateCompanyCache(vars.companyId)
+      await queryClient.invalidateQueries({ queryKey: ['pulse-notifications'] })
+      await queryClient.invalidateQueries({ queryKey: ['company-reports', vars.companyId] })
+      await queryClient.invalidateQueries({ queryKey: ['company-aggregates', vars.companyId] })
+      await queryClient.invalidateQueries({ queryKey: ['company', 'mine'] })
+      await queryClient.invalidateQueries({ queryKey: ['company-health-scores', vars.companyId] })
+      await queryClient.invalidateQueries({ queryKey: ['company-activity-feed'] })
+      await queryClient.invalidateQueries({ queryKey: dashboardOverviewQueryKey(vars.companyId) })
+    },
+    onError: (e: Error) => {
+      toast.error(e.message ?? 'Analysis failed')
     },
   })
 }

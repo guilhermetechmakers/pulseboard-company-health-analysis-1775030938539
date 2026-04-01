@@ -1,6 +1,11 @@
 import { buildAuthenticatedEdgeHeaders } from '@/lib/pulseboard-request-headers'
 import { supabase } from '@/lib/supabase'
-import type { AnalyzeCompanyRequest } from '@/types/analysis'
+import type {
+  AnalysisDepth,
+  AnalyzeCompanyRequest,
+  AnalysisJobCreateResult,
+  AnalysisJobStatusPayload,
+} from '@/types/analysis'
 import type { DashboardOverviewResponse } from '@/types/dashboard'
 import type { ExportDownloadUrlResponseData, ReportExportResponseData } from '@/types/export'
 import type {
@@ -168,7 +173,15 @@ export async function invokeAnalyzeCompanyHealth(
   const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/analyze-company-health`, {
     method: 'POST',
     headers,
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      companyId: body.companyId,
+      reportId: body.reportId,
+      analysisDepth: body.analysisDepth,
+      benchmarking: body.benchmarking,
+      consent: body.consent,
+      sendToEmail: body.sendReportEmail ?? false,
+      email: body.reportEmail ?? '',
+    }),
   })
 
   const json = (await res.json()) as { data?: AnalyzeCompanyResponse['data']; error?: unknown }
@@ -188,6 +201,158 @@ export async function invokeAnalyzeCompanyHealth(
   }
 
   return json as AnalyzeCompanyResponse
+}
+
+export type PulseAnalysesApiBody =
+  | {
+      op: 'create'
+      companyId: string
+      depth: AnalysisDepth
+      includeBenchmarks: boolean
+      sendToEmail: boolean
+      email?: string
+      consentGiven: boolean
+    }
+  | { op: 'get'; analysisId: string }
+
+export async function invokePulseAnalysesApi(
+  body: PulseAnalysesApiBody,
+): Promise<{ data: AnalysisJobCreateResult } | { data: AnalysisJobStatusPayload }> {
+  if (!supabase) {
+    throw new Error('Supabase is not configured')
+  }
+
+  const url = import.meta.env.VITE_SUPABASE_URL
+  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
+  if (!url || !anon) {
+    throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
+  }
+
+  const headers = await buildAuthenticatedEdgeHeaders()
+  if (!headers.Authorization?.startsWith('Bearer ')) {
+    throw new Error('Sign in required')
+  }
+
+  const base = `${url.replace(/\/$/, '')}/functions/v1/pulse-analyses-api`
+
+  if (body.op === 'get') {
+    const qs = new URLSearchParams({ analysisId: body.analysisId })
+    const res = await fetch(`${base}?${qs.toString()}`, {
+      method: 'GET',
+      headers,
+    })
+    const json = (await res.json()) as {
+      data?: AnalysisJobStatusPayload
+      error?: unknown
+    }
+    if (!res.ok) {
+      const errMsg =
+        typeof json.error === 'string'
+          ? json.error
+          : json.error !== undefined
+            ? JSON.stringify(json.error)
+            : `Analyses API failed (${res.status})`
+      throw new Error(errMsg)
+    }
+    if (!json.data) {
+      throw new Error('Invalid analyses status response')
+    }
+    return json as { data: AnalysisJobStatusPayload }
+  }
+
+  const res = await fetch(base, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      companyId: body.companyId,
+      depth: body.depth,
+      includeBenchmarks: body.includeBenchmarks,
+      sendToEmail: body.sendToEmail,
+      email: body.email ?? null,
+      consentGiven: body.consentGiven,
+    }),
+  })
+
+  const json = (await res.json()) as {
+    data?: AnalysisJobCreateResult
+    error?: unknown
+  }
+
+  if (!res.ok) {
+    const errMsg =
+      typeof json.error === 'string'
+        ? json.error
+        : json.error !== undefined
+          ? JSON.stringify(json.error)
+          : `Analyses API failed (${res.status})`
+    throw new Error(errMsg)
+  }
+
+  if (!json.data?.analysisId) {
+    throw new Error('Invalid analyses API response')
+  }
+
+  return json as { data: AnalysisJobCreateResult }
+}
+
+export type PulseNotificationsTriggerBody = {
+  type:
+    | 'analysis_complete'
+    | 'export_ready'
+    | 'job_failed'
+    | 'billing_alert'
+    | 'admin_alert'
+    | 'report_saved'
+    | 'snapshot_created'
+    | 'custom'
+  message: string
+  data?: Record<string, unknown>
+}
+
+export async function invokePulseNotificationsTrigger(
+  body: PulseNotificationsTriggerBody,
+): Promise<{ data: { notificationId: string; inboxItemId: string } }> {
+  if (!supabase) {
+    throw new Error('Supabase is not configured')
+  }
+
+  const url = import.meta.env.VITE_SUPABASE_URL
+  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
+  if (!url || !anon) {
+    throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
+  }
+
+  const headers = await buildAuthenticatedEdgeHeaders()
+  if (!headers.Authorization?.startsWith('Bearer ')) {
+    throw new Error('Sign in required')
+  }
+
+  const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/pulse-notifications-trigger`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  })
+
+  const json = (await res.json()) as {
+    data?: { notificationId: string; inboxItemId: string }
+    error?: unknown
+  }
+
+  if (!res.ok) {
+    const errMsg =
+      typeof json.error === 'string'
+        ? json.error
+        : json.error !== undefined
+          ? JSON.stringify(json.error)
+          : `Notification trigger failed (${res.status})`
+    throw new Error(errMsg)
+  }
+
+  if (!json.data?.notificationId) {
+    throw new Error('Invalid notification trigger response')
+  }
+
+  return json as { data: { notificationId: string; inboxItemId: string } }
 }
 
 export type AuthServerLogBody = {

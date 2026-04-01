@@ -190,6 +190,12 @@ export interface Database {
           source_model: string | null
           benchmarking_enabled: boolean
           consent_recorded_at: string | null
+          progress: number
+          progress_percent: number
+          analysis_logs: unknown[]
+          send_report_email: boolean
+          report_email: string | null
+          report_delivery_email: string | null
           status: string
           executive_summary: string | null
           swot: Record<string, unknown>
@@ -212,6 +218,12 @@ export interface Database {
           source_model?: string | null
           benchmarking_enabled?: boolean
           consent_recorded_at?: string | null
+          progress?: number
+          progress_percent?: number
+          analysis_logs?: unknown[]
+          send_report_email?: boolean
+          report_email?: string | null
+          report_delivery_email?: string | null
           status?: string
           executive_summary?: string | null
           swot?: Record<string, unknown>
@@ -227,6 +239,48 @@ export interface Database {
           updated_at?: string
         }
         Update: Partial<Database['public']['Tables']['reports']['Insert']>
+        Relationships: []
+      }
+      analysis_jobs: {
+        Row: {
+          id: string
+          company_id: string
+          user_id: string
+          depth: string
+          include_benchmarks: boolean
+          consent_given: boolean
+          send_to_email: boolean
+          email: string | null
+          status: string
+          progress: number
+          started_at: string
+          completed_at: string | null
+          updated_at: string
+          report_id: string | null
+          result_payload: Record<string, unknown>
+          logs: string[]
+          error_message: string | null
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          user_id: string
+          depth?: string
+          include_benchmarks?: boolean
+          consent_given?: boolean
+          send_to_email?: boolean
+          email?: string | null
+          status?: string
+          progress?: number
+          started_at?: string
+          completed_at?: string | null
+          updated_at?: string
+          report_id?: string | null
+          result_payload?: Record<string, unknown>
+          logs?: string[]
+          error_message?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['analysis_jobs']['Insert']>
         Relationships: []
       }
       report_snapshots: {

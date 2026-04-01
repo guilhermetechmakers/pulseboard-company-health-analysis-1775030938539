@@ -24,4 +24,42 @@ export interface AnalyzeCompanyRequest {
   benchmarking: boolean
   /** Must be true — enforced server-side. */
   consent: boolean
+  /** Continues a queued `reports` row (pulse-analyses-api uses `analysis_jobs` instead). */
+  reportId?: string
+  /** Optional copy of the report via Resend to this address (requires server secrets). */
+  sendReportEmail?: boolean
+  reportEmail?: string | null
+}
+
+export type AnalysisJobApiStatus = 'queued' | 'running' | 'completed' | 'failed'
+
+export interface AnalysisJobCreateResult {
+  analysisId: string
+  status: AnalysisJobApiStatus
+  startedAt: string
+  progress: number
+}
+
+export interface AnalysisJobResultsPreview {
+  executiveSummary: string
+  swot: unknown
+  financial: string | null
+  market: string | null
+  social: string | null
+  risks: string[]
+  opportunities: string[]
+  actionPlan: unknown
+}
+
+export interface AnalysisJobStatusPayload {
+  analysisId: string
+  status: AnalysisJobApiStatus
+  progress: number
+  logs: string[]
+  startedAt?: string
+  completedAt?: string
+  /** Populated when the worker finishes and links a `reports` row. */
+  reportId?: string | null
+  error?: string | null
+  results?: AnalysisJobResultsPreview
 }
