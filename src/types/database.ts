@@ -462,6 +462,8 @@ export interface Database {
           entity: string
           entity_id: string | null
           metadata: Record<string, unknown>
+          target: Record<string, unknown> | null
+          notes: string | null
           created_at: string
         }
         Insert: {
@@ -471,6 +473,8 @@ export interface Database {
           entity: string
           entity_id?: string | null
           metadata?: Record<string, unknown>
+          target?: Record<string, unknown> | null
+          notes?: string | null
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['audit_logs']['Insert']>

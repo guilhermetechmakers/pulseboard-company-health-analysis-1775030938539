@@ -15,6 +15,11 @@ type AdminAction =
   | 'users_export'
   | 'activity_list'
   | 'usage_series'
+  | 'audit_logs_list'
+  | 'audit_logs_get'
+  | 'audit_logs_create'
+  | 'audit_logs_export'
+  | 'audit_logs_stats'
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -34,15 +39,18 @@ function escapeIlike(s: string): string {
 async function requireAdmin(
   req: Request,
   supabaseAdmin: ReturnType<typeof createClient>,
-): Promise<{ ok: true; userId: string } | { ok: false; response: Response }> {
+): Promise<
+  | { ok: true; userId: string }
+  | { ok: false; response: Response; reason: 'unauthenticated' | 'forbidden'; userId: string | null }
+> {
   const authHeader = req.headers.get('Authorization')
   if (!authHeader?.startsWith('Bearer ')) {
-    return { ok: false, response: json({ error: 'Unauthorized' }, 401) }
+    return { ok: false, response: json({ error: 'Unauthorized' }, 401), reason: 'unauthenticated', userId: null }
   }
   const jwt = authHeader.slice(7)
   const { data, error } = await supabaseAdmin.auth.getUser(jwt)
   if (error || !data.user) {
-    return { ok: false, response: json({ error: 'Unauthorized' }, 401) }
+    return { ok: false, response: json({ error: 'Unauthorized' }, 401), reason: 'unauthenticated', userId: null }
   }
   const uid = data.user.id
   const { data: prof, error: perr } = await supabaseAdmin
@@ -51,12 +59,44 @@ async function requireAdmin(
     .eq('id', uid)
     .maybeSingle()
   if (perr || !prof) {
-    return { ok: false, response: json({ error: 'Forbidden' }, 403) }
+    return { ok: false, response: json({ error: 'Forbidden' }, 403), reason: 'forbidden', userId: uid }
   }
   if (prof.role !== 'admin' || prof.account_status === 'suspended') {
-    return { ok: false, response: json({ error: 'Forbidden' }, 403) }
+    return { ok: false, response: json({ error: 'Forbidden' }, 403), reason: 'forbidden', userId: uid }
   }
   return { ok: true, userId: uid }
+}
+
+const AUDIT_LOG_ACTIONS = new Set([
+  'audit_logs_list',
+  'audit_logs_get',
+  'audit_logs_create',
+  'audit_logs_export',
+  'audit_logs_stats',
+])
+
+async function logAuditLogsAccessDenied(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  input: { attemptedAction: string; reason: string; userId: string | null },
+) {
+  try {
+    await supabaseAdmin.from('audit_logs').insert({
+      actor_user_id: input.userId,
+      action: 'admin_audit_logs_access_denied',
+      entity: 'security',
+      entity_id: null,
+      metadata: { attemptedAction: input.attemptedAction, reason: input.reason },
+      notes: null,
+    })
+  } catch {
+    /* best-effort */
+  }
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function isUuid(s: string): boolean {
+  return UUID_RE.test(s)
 }
 
 function num(v: unknown, fallback = 0): number {
@@ -66,6 +106,67 @@ function num(v: unknown, fallback = 0): number {
 
 function str(v: unknown): string | undefined {
   return typeof v === 'string' ? v : undefined
+}
+
+function sanitizeTargetJson(v: unknown): Record<string, unknown> {
+  if (!isRecord(v)) return {}
+  const out: Record<string, unknown> = {}
+  for (const [k, val] of Object.entries(v)) {
+    if (k.length > 200) continue
+    if (typeof val === 'string' && val.length > 8000) {
+      out[k] = val.slice(0, 8000) + '…'
+      continue
+    }
+    if (typeof val === 'number' && Number.isFinite(val)) {
+      out[k] = val
+      continue
+    }
+    if (typeof val === 'boolean') {
+      out[k] = val
+      continue
+    }
+    if (val === null) {
+      out[k] = null
+      continue
+    }
+    if (isRecord(val)) {
+      out[k] = sanitizeTargetJson(val)
+      continue
+    }
+    if (Array.isArray(val)) {
+      out[k] = val.slice(0, 50)
+      continue
+    }
+  }
+  return out
+}
+
+function rowToAuditPayload(
+  r: Record<string, unknown>,
+  actorEmail: string,
+  actorName: string,
+): Record<string, unknown> {
+  const meta = isRecord(r.metadata) ? r.metadata : {}
+  const targetCol = r.target !== undefined && r.target !== null && isRecord(r.target) ? r.target : {}
+  const target: Record<string, unknown> = {
+    ...meta,
+    ...targetCol,
+    entity: typeof r.entity === 'string' ? r.entity : '',
+    entityId: typeof r.entity_id === 'string' ? r.entity_id : null,
+  }
+  return {
+    id: typeof r.id === 'string' ? r.id : String(r.id),
+    actorId: typeof r.actor_user_id === 'string' ? r.actor_user_id : null,
+    action: typeof r.action === 'string' ? r.action : '',
+    entity: typeof r.entity === 'string' ? r.entity : '',
+    entityId: typeof r.entity_id === 'string' ? r.entity_id : null,
+    target,
+    notes: typeof r.notes === 'string' ? r.notes : null,
+    createdAt: typeof r.created_at === 'string' ? r.created_at : '',
+    actorEmail,
+    actorName,
+    metadata: meta,
+  }
 }
 
 serve(async (req) => {
@@ -80,10 +181,6 @@ serve(async (req) => {
   }
 
   const supabaseAdmin = createClient(supabaseUrl, serviceKey)
-
-  const adminGate = await requireAdmin(req, supabaseAdmin)
-  if (!adminGate.ok) return adminGate.response
-  const adminId = adminGate.userId
 
   let body: Record<string, unknown> = {}
   if (req.method === 'POST' || req.method === 'PATCH') {
@@ -104,6 +201,19 @@ serve(async (req) => {
 
   const actionRaw = body.action
   const action = typeof actionRaw === 'string' ? actionRaw : ''
+
+  const adminGate = await requireAdmin(req, supabaseAdmin)
+  if (!adminGate.ok) {
+    if (AUDIT_LOG_ACTIONS.has(action)) {
+      await logAuditLogsAccessDenied(supabaseAdmin, {
+        attemptedAction: action,
+        reason: adminGate.reason,
+        userId: adminGate.userId,
+      })
+    }
+    return adminGate.response
+  }
+  const adminId = adminGate.userId
 
   try {
     if (action === 'metrics_usage') {
@@ -485,7 +595,309 @@ serve(async (req) => {
       return json({ data: { url } })
     }
 
-    return json({ error: 'Unknown action', allowed: ['metrics_usage', 'system_health', 'users_list', 'users_patch', 'users_export', 'activity_list', 'usage_series'] }, 400)
+    if (action === 'audit_logs_stats') {
+      const since24h = new Date(Date.now() - 86400000).toISOString()
+      const since7d = new Date(Date.now() - 7 * 86400000).toISOString()
+      const [{ count: totalAll }, { count: last24h }, { data: rows7d }] = await Promise.all([
+        supabaseAdmin.from('audit_logs').select('id', { count: 'exact', head: true }),
+        supabaseAdmin.from('audit_logs').select('id', { count: 'exact', head: true }).gte('created_at', since24h),
+        supabaseAdmin.from('audit_logs').select('created_at').gte('created_at', since7d),
+      ])
+      const dayList = Array.isArray(rows7d) ? rows7d : []
+      const byDay = new Map<string, number>()
+      for (const r of dayList) {
+        if (!isRecord(r)) continue
+        const ca = typeof r.created_at === 'string' ? r.created_at : ''
+        if (!ca) continue
+        const day = ca.slice(0, 10)
+        byDay.set(day, (byDay.get(day) ?? 0) + 1)
+      }
+      const sortedDays = [...byDay.keys()].sort()
+      const series = sortedDays.map((d) => ({ date: d, count: byDay.get(d) ?? 0 }))
+      return json({
+        data: {
+          total: num(totalAll, 0),
+          last24h: num(last24h, 0),
+          series,
+        },
+      })
+    }
+
+    if (action === 'audit_logs_list') {
+      const page = Math.max(1, num(body.page, 1))
+      const pageSize = Math.min(100, Math.max(1, num(body.pageSize, 20)))
+      const from = (page - 1) * pageSize
+      const to = from + pageSize - 1
+      const actorFilter = str(body.actorId)
+      const actionLike = str(body.actionFilter) ?? str(body.auditActionFilter)
+      const entityFilter = str(body.targetType) ?? str(body.entity)
+      const startDate = str(body.startDate)
+      const endDate = str(body.endDate)
+      const searchRaw = str(body.search)
+      const sortAsc = str(body.sort) === 'asc'
+
+      let q = supabaseAdmin.from('audit_logs').select('*', { count: 'exact' })
+
+      if (actorFilter && isUuid(actorFilter)) {
+        q = q.eq('actor_user_id', actorFilter)
+      }
+      if (actionLike && actionLike.trim()) {
+        const safe = escapeIlike(actionLike.trim())
+        q = q.ilike('action', `%${safe}%`)
+      }
+      if (entityFilter && entityFilter.trim()) {
+        q = q.eq('entity', entityFilter.trim())
+      }
+      if (startDate && startDate.trim()) {
+        const d = startDate.trim()
+        q = q.gte('created_at', d.includes('T') ? d : `${d}T00:00:00.000Z`)
+      }
+      if (endDate && endDate.trim()) {
+        const d = endDate.trim()
+        q = q.lte('created_at', d.includes('T') ? d : `${d}T23:59:59.999Z`)
+      }
+      if (searchRaw && searchRaw.trim()) {
+        const safe = escapeIlike(searchRaw.trim())
+        q = q.or(`action.ilike.%${safe}%,entity.ilike.%${safe}%,notes.ilike.%${safe}%`)
+      }
+
+      const { data: rows, error, count } = await q
+        .order('created_at', { ascending: sortAsc })
+        .range(from, to)
+      if (error) throw new Error(error.message)
+
+      const list = Array.isArray(rows) ? rows : []
+      const actorIds = [
+        ...new Set(
+          list
+            .map((r) => (isRecord(r) && typeof r.actor_user_id === 'string' ? r.actor_user_id : null))
+            .filter((x): x is string => x !== null && isUuid(x)),
+        ),
+      ]
+      const profileById = new Map<string, { display_name: string }>()
+      if (actorIds.length > 0) {
+        const { data: profs } = await supabaseAdmin.from('profiles').select('id, display_name').in('id', actorIds)
+        const parr = Array.isArray(profs) ? profs : []
+        for (const p of parr) {
+          if (!isRecord(p) || typeof p.id !== 'string') continue
+          profileById.set(p.id, { display_name: typeof p.display_name === 'string' ? p.display_name : '' })
+        }
+      }
+
+      const emailById = new Map<string, string>()
+      for (const aid of actorIds) {
+        const { data: uData } = await supabaseAdmin.auth.admin.getUserById(aid)
+        const em = uData?.user?.email
+        emailById.set(aid, typeof em === 'string' ? em : '')
+      }
+
+      const logs = list.map((raw) => {
+        const r = isRecord(raw) ? raw : {}
+        const aid = typeof r.actor_user_id === 'string' ? r.actor_user_id : null
+        const prof = aid ? profileById.get(aid) : undefined
+        const email = aid ? (emailById.get(aid) ?? '') : ''
+        const displayName = prof?.display_name?.trim() ?? ''
+        return rowToAuditPayload(r, email, displayName !== '' ? displayName : email || '—')
+      })
+
+      await supabaseAdmin.from('admin_actions').insert({
+        admin_id: adminId,
+        action: 'audit_logs_list_viewed',
+        target_user_id: null,
+        metadata: { page, pageSize, filters: { actorFilter, actionLike, entityFilter, startDate, endDate, searchRaw } },
+      })
+
+      return json({
+        data: {
+          total: num(count, logs.length),
+          page,
+          pageSize,
+          logs,
+        },
+      })
+    }
+
+    if (action === 'audit_logs_get') {
+      const id = str(body.id)
+      if (!id || !isUuid(id)) return json({ error: 'Valid id required' }, 400)
+      const { data: row, error } = await supabaseAdmin.from('audit_logs').select('*').eq('id', id).maybeSingle()
+      if (error) throw new Error(error.message)
+      if (!row || !isRecord(row)) return json({ error: 'Not found' }, 404)
+      const aid = typeof row.actor_user_id === 'string' ? row.actor_user_id : null
+      let actorEmail = ''
+      let actorName = '—'
+      if (aid && isUuid(aid)) {
+        const { data: prof } = await supabaseAdmin.from('profiles').select('display_name').eq('id', aid).maybeSingle()
+        const { data: uData } = await supabaseAdmin.auth.admin.getUserById(aid)
+        actorEmail = typeof uData?.user?.email === 'string' ? uData.user.email : ''
+        const dn = prof && isRecord(prof) && typeof prof.display_name === 'string' ? prof.display_name.trim() : ''
+        actorName = dn !== '' ? dn : actorEmail || '—'
+      }
+      await supabaseAdmin.from('admin_actions').insert({
+        admin_id: adminId,
+        action: 'audit_logs_entry_viewed',
+        target_user_id: null,
+        metadata: { auditLogId: id },
+      })
+      return json({ data: rowToAuditPayload(row, actorEmail, actorName) })
+    }
+
+    if (action === 'audit_logs_create') {
+      const act = str(body.logAction) ?? str(body.entryAction)
+      if (!act || !act.trim()) return json({ error: 'logAction required' }, 400)
+      const actorOverride = str(body.actorId)
+      if (actorOverride !== undefined && actorOverride !== '' && !isUuid(actorOverride)) {
+        return json({ error: 'actorId must be a valid UUID' }, 400)
+      }
+      const notesVal = str(body.notes)
+      const targetSnapshot = sanitizeTargetJson(body.target)
+      const entityFromTarget =
+        typeof targetSnapshot.entity === 'string'
+          ? targetSnapshot.entity
+          : typeof targetSnapshot.entityType === 'string'
+            ? targetSnapshot.entityType
+            : 'application'
+      const entityIdVal =
+        typeof targetSnapshot.entityId === 'string'
+          ? targetSnapshot.entityId
+          : typeof targetSnapshot.entity_id === 'string'
+            ? targetSnapshot.entity_id
+            : null
+      const meta = { ...targetSnapshot }
+      delete meta.entity
+      delete meta.entityType
+      delete meta.entityId
+      delete meta.entity_id
+
+      const insertRow = {
+        actor_user_id: actorOverride && actorOverride !== '' ? actorOverride : adminId,
+        action: act.trim(),
+        entity: entityFromTarget || 'application',
+        entity_id: entityIdVal,
+        metadata: meta,
+        target: targetSnapshot,
+        notes: notesVal ?? null,
+      }
+
+      const { data: created, error } = await supabaseAdmin.from('audit_logs').insert(insertRow).select('*').maybeSingle()
+      if (error) throw new Error(error.message)
+      if (!created || !isRecord(created)) return json({ error: 'Insert failed' }, 500)
+
+      await supabaseAdmin.from('admin_actions').insert({
+        admin_id: adminId,
+        action: 'audit_logs_manual_create',
+        target_user_id: null,
+        metadata: { auditLogId: created.id },
+      })
+
+      const aid = typeof created.actor_user_id === 'string' ? created.actor_user_id : null
+      let actorEmail = ''
+      let actorName = '—'
+      if (aid && isUuid(aid)) {
+        const { data: uData } = await supabaseAdmin.auth.admin.getUserById(aid)
+        actorEmail = typeof uData?.user?.email === 'string' ? uData.user.email : ''
+        actorName = actorEmail || '—'
+      }
+
+      return json({ data: rowToAuditPayload(created, actorEmail, actorName) })
+    }
+
+    if (action === 'audit_logs_export') {
+      const format = str(body.format) === 'json' ? 'json' : 'csv'
+      const filters = isRecord(body.filters) ? body.filters : {}
+      const actorFilter = str(filters.actorId)
+      const actionLike = str(filters.actionFilter) ?? str(filters.action)
+      const entityFilter = str(filters.targetType) ?? str(filters.entity)
+      const startDate = str(filters.startDate)
+      const endDate = str(filters.endDate)
+      const searchRaw = str(filters.search)
+      const sortAsc = str(filters.sort) === 'asc'
+
+      let q = supabaseAdmin.from('audit_logs').select('*')
+      if (actorFilter && isUuid(actorFilter)) q = q.eq('actor_user_id', actorFilter)
+      if (actionLike && actionLike.trim()) {
+        const safe = escapeIlike(actionLike.trim())
+        q = q.ilike('action', `%${safe}%`)
+      }
+      if (entityFilter && entityFilter.trim()) q = q.eq('entity', entityFilter.trim())
+      if (startDate && startDate.trim()) {
+        const d = startDate.trim()
+        q = q.gte('created_at', d.includes('T') ? d : `${d}T00:00:00.000Z`)
+      }
+      if (endDate && endDate.trim()) {
+        const d = endDate.trim()
+        q = q.lte('created_at', d.includes('T') ? d : `${d}T23:59:59.999Z`)
+      }
+      if (searchRaw && searchRaw.trim()) {
+        const safe = escapeIlike(searchRaw.trim())
+        q = q.or(`action.ilike.%${safe}%,entity.ilike.%${safe}%,notes.ilike.%${safe}%`)
+      }
+
+      const { data: rows, error } = await q.order('created_at', { ascending: sortAsc }).limit(5000)
+      if (error) throw new Error(error.message)
+      const list = Array.isArray(rows) ? rows : []
+
+      const exportRows = list.map((raw) => {
+        const r = isRecord(raw) ? raw : {}
+        const payload = rowToAuditPayload(r, '', '')
+        const tgt = isRecord(payload.target) ? payload.target : {}
+        return {
+          id: typeof payload.id === 'string' ? payload.id : String(payload.id ?? ''),
+          actorId: typeof payload.actorId === 'string' ? payload.actorId : null,
+          action: typeof payload.action === 'string' ? payload.action : '',
+          entity: typeof payload.entity === 'string' ? payload.entity : '',
+          entityId: typeof payload.entityId === 'string' ? payload.entityId : null,
+          target: tgt,
+          notes: typeof payload.notes === 'string' ? payload.notes : null,
+          createdAt: typeof payload.createdAt === 'string' ? payload.createdAt : '',
+        }
+      })
+
+      if (format === 'json') {
+        const jsonStr = JSON.stringify(exportRows, null, 2)
+        const b64 = btoa(unescape(encodeURIComponent(jsonStr)))
+        const url = `data:application/json;base64,${b64}`
+        return json({ data: { url } })
+      }
+
+      const header = ['id', 'actorId', 'action', 'entity', 'entityId', 'notes', 'createdAt', 'targetJson']
+      const lines = [
+        header.join(','),
+        ...exportRows.map((er) =>
+          [
+            er.id,
+            er.actorId ?? '',
+            `"${String(er.action).replace(/"/g, '""')}"`,
+            `"${String(er.entity).replace(/"/g, '""')}"`,
+            er.entityId ?? '',
+            `"${String(er.notes ?? '').replace(/"/g, '""')}"`,
+            er.createdAt,
+            `"${JSON.stringify(er.target ?? {}).replace(/"/g, '""')}"`,
+          ].join(','),
+        ),
+      ]
+      const csv = lines.join('\n')
+      const url = `data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`
+      return json({ data: { url } })
+    }
+
+    return json({
+      error: 'Unknown action',
+      allowed: [
+        'metrics_usage',
+        'system_health',
+        'users_list',
+        'users_patch',
+        'users_export',
+        'activity_list',
+        'usage_series',
+        'audit_logs_list',
+        'audit_logs_get',
+        'audit_logs_create',
+        'audit_logs_export',
+        'audit_logs_stats',
+      ],
+    }, 400)
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Unknown error'
     return json({ error: message }, 500)

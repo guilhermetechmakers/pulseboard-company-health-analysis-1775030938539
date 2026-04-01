@@ -440,3 +440,50 @@ export async function invokeAdminApi(body: Record<string, unknown>): Promise<Rec
   }
   return json
 }
+
+export type ClientErrorReportBody = {
+  errorMessage: string
+  stack?: string
+  route?: string
+  componentStack?: string
+  correlationId?: string
+}
+
+/** Reports UI errors to Edge Function (audit_logs + optional webhook). Non-blocking. */
+export async function invokeClientErrorReport(body: ClientErrorReportBody): Promise<void> {
+  if (!supabase) return
+  const url = import.meta.env.VITE_SUPABASE_URL
+  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
+  if (!url || !anon) return
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  const headers: Record<string, string> = {
+    apikey: anon,
+    'Content-Type': 'application/json',
+  }
+  if (session?.access_token) {
+    headers.Authorization = `Bearer ${session.access_token}`
+  }
+
+  try {
+    const res = await fetch(`${url.replace(/\/$/, '')}/functions/v1/client-error-report`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        errorMessage: body.errorMessage,
+        stack: body.stack,
+        route: body.route,
+        componentStack: body.componentStack,
+        correlationId: body.correlationId,
+      }),
+    })
+    if (!res.ok) {
+      /* non-blocking */
+    }
+  } catch {
+    /* non-blocking */
+  }
+}

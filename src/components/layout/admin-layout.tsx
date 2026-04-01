@@ -1,10 +1,11 @@
 import { Outlet, NavLink } from 'react-router-dom'
-import { LayoutGrid, Shield, Users } from 'lucide-react'
+import { LayoutGrid, ScrollText, Shield, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const adminNav = [
   { to: '/admin', label: 'Overview', end: true, icon: LayoutGrid },
   { to: '/admin/users', label: 'User management', end: false, icon: Users },
+  { to: '/admin/audit-logs', label: 'Audit logs', end: false, icon: ScrollText },
 ]
 
 export function AdminLayout() {

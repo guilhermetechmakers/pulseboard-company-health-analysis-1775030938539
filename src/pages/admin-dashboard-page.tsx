@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Activity, ArrowRight, FileBarChart, Gauge, Server } from 'lucide-react'
+import { Activity, ArrowRight, FileBarChart, Gauge, ScrollText, Server } from 'lucide-react'
 import { fetchAdminSystemHealth, fetchAdminUsageMetrics } from '@/api/admin'
 import { KpiCard } from '@/components/admin/kpi-card'
 import { AdminTimeSeriesChart } from '@/components/admin/time-series-chart'
@@ -151,6 +151,15 @@ export function AdminDashboardPage() {
                   <span className="flex items-center gap-2">
                     <FileBarChart className="h-4 w-4" aria-hidden />
                     User management
+                  </span>
+                  <ArrowRight className="h-4 w-4 opacity-70" aria-hidden />
+                </Link>
+              </Button>
+              <Button asChild variant="secondary" className="justify-between">
+                <Link to="/admin/audit-logs">
+                  <span className="flex items-center gap-2">
+                    <ScrollText className="h-4 w-4" aria-hidden />
+                    Audit logs & errors
                   </span>
                   <ArrowRight className="h-4 w-4 opacity-70" aria-hidden />
                 </Link>

@@ -23,6 +23,7 @@ import {
   SettingsPage,
   AdminUsersPage,
   AdminDashboardPage,
+  AdminAuditLogsPage,
   PasswordResetRequestPage,
   PasswordResetConfirmPage,
   NotFoundPage,
@@ -30,6 +31,7 @@ import {
 } from '@/pages'
 import { AdminOnlyRoute } from '@/components/auth/admin-only-route'
 import { AdminLayout } from '@/components/layout/admin-layout'
+import { GlobalErrorBoundary } from '@/components/error-boundary/global-error-boundary'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -51,7 +53,8 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter>
-          <AppShell>
+          <GlobalErrorBoundary>
+            <AppShell>
             <Routes>
               <Route path="/" element={<LandingPage />} />
               <Route path="/signup" element={<SignupPage />} />
@@ -93,10 +96,12 @@ export default function App() {
               >
                 <Route index element={<AdminDashboardPage />} />
                 <Route path="users" element={<AdminUsersPage />} />
+                <Route path="audit-logs" element={<AdminAuditLogsPage />} />
               </Route>
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
-          </AppShell>
+            </AppShell>
+          </GlobalErrorBoundary>
         </BrowserRouter>
       </AuthProvider>
       <Toaster richColors position="top-right" />

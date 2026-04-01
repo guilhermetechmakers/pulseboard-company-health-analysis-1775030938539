@@ -67,6 +67,7 @@ export const SocialBrandPage = () => (
 
 export { AdminDashboardPage } from '@/pages/admin-dashboard-page'
 export { AdminUsersPage } from '@/pages/admin-users-page'
+export { AdminAuditLogsPage } from '@/pages/admin-audit-logs-page'
 
 export function NotFoundPage() {
   return (
